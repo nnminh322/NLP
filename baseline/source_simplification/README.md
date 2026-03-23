@@ -19,7 +19,14 @@ The benchmark comprises four subsets derived from financial datasets:
 ### Getting Started
 
 #### 1. Setup Environment
-Ensure you have Python 3.12+ and `uv` installed.
+Ensure you have Python 3.12+ installed.
+
+**Option A: Using requirements.txt (Recommended for Colab)**
+```bash
+pip install -r requirements.txt
+```
+
+**Option B: Using uv and Makefile**
 ```bash
 make sync-all
 ```
