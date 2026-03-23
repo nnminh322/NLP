@@ -4,44 +4,23 @@
 DATASETS=("G4KMU/finqa-german" "G4KMU/convfinqa" "G4KMU/tat-dqa")
 MODEL="intfloat/multilingual-e5-large-instruct"
 
-# Color codes
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m' # No Color
+# Alias để gọi CLI qua python nếu lệnh trực tiếp fail
+HF_COMMAND="python3 -m huggingface_hub.commands.huggingface_cli"
 
-# Check for huggingface-cli
-if ! command -v huggingface-cli &> /dev/null; then
-    echo -e "${RED}Error: huggingface-cli could not be found.${NC}"
-    echo "Please install it using: pip install huggingface-hub"
-    exit 1
-fi
+echo "Starting T2-RAGBench Data Download Script"
 
-echo -e "${GREEN}Starting T2-RAGBench Data Download Script${NC}"
-echo "----------------------------------------"
-
-# Function to download dataset
 download_dataset() {
-    local ds=$1
-    echo -e "${GREEN}Downloading dataset: $ds...${NC}"
-    huggingface-cli download --repo-type dataset "$ds"
+    echo "Downloading dataset: $1..."
+    $HF_COMMAND download --repo-type dataset "$1"
 }
 
-# Function to download model
 download_model() {
-    local mod=$1
-    echo -e "${GREEN}Downloading embedding model: $mod...${NC}"
-    huggingface-cli download "$mod"
+    echo "Downloading embedding model: $1..."
+    $HF_COMMAND download "$1"
 }
 
-# Menu
-echo "Choose what to download:"
-echo "1) All (Datasets + Embedding Model)"
-echo "2) Only Datasets"
-echo "3) Only Embedding Model"
-echo "4) Specific Dataset"
-echo "q) Quit"
-
-read -p "Enter choice [1-4, q]: " choice
+# Lấy lựa chọn từ tham số dòng lệnh ($1), nếu không có thì mặc định là 1
+choice=${1:-1}
 
 case $choice in
     1)
@@ -54,23 +33,10 @@ case $choice in
     3)
         download_model "$MODEL"
         ;;
-    4)
-        echo "Choose dataset:"
-        select ds in "${DATASETS[@]}"; do
-            if [ -n "$ds" ]; then
-                download_dataset "$ds"
-                break
-            else
-                echo "Invalid selection"
-            fi
-        done
-        ;;
-    q)
-        exit 0
-        ;;
     *)
-        echo "Invalid choice"
+        echo "Invalid choice or usage: !bash download_data.sh [1-3]"
+        exit 1
         ;;
 esac
 
-echo -e "${GREEN}Finished!${NC}"
+echo "Finished!"
