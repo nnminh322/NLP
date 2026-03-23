@@ -44,7 +44,9 @@ def main(cfg: Config) -> None:
     mlflow.set_experiment(experiment_name=cfg.dataset.name)
 
     with mlflow.start_run():
-        qa_dataset = load_dataset(cfg.dataset.name, split=cfg.dataset.split).to_pandas()
+        qa_dataset = load_dataset(
+            cfg.dataset.name, cfg.dataset.config_name, split=cfg.dataset.split
+        ).to_pandas()
         dataset = get_dataset_class(cfg.dataset.runner_name)
         dataset_obj = dataset(
             qa_dataset,

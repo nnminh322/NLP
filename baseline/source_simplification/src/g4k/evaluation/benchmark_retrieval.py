@@ -61,7 +61,9 @@ def run_benchmark(cfg: Config, mode: str, dataset: str) -> None:
     runner = BatchInferenceRunner(sampling_params, runner_model, base_url=runner_url)
     
     # Load dataset
-    qa_dataset = load_dataset(cfg.dataset.name, split=cfg.dataset.split).to_pandas()
+    qa_dataset = load_dataset(
+        cfg.dataset.name, cfg.dataset.config_name, split=cfg.dataset.split
+    ).to_pandas()
     dataset_cls = get_dataset_class(cfg.dataset.runner_name)
     dataset_obj = dataset_cls(
         qa_dataset,

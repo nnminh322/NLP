@@ -16,8 +16,45 @@ The benchmark comprises four subsets derived from financial datasets:
 | TAT-DQA | Finance | 2,723 | 11,349 | 915.3 | 31.7 |
 
 ---
+### Getting Started
+
+#### 1. Setup Environment
+Ensure you have Python 3.12+ and `uv` installed.
+```bash
+make sync-all
+```
+
+#### 2. Pre-fetch Data (Optional)
+You can pre-cache datasets and models using the provided script:
+```bash
+python download_data.py -m 2
+```
+
+#### 3. Run Retrieval Baseline
+Run the standalone benchmarking script with the dataset and retrieval mode:
+```bash
+python src/g4k/evaluation/benchmark_retrieval.py --dataset <DATASET> --mode <MODE>
+```
+
+**Available Datasets:**
+- `finqa`
+- `convfinqa`
+- `tatqa`
+
+**Available Modes:**
+| Mode Architecture | Argument (`--mode`) | Description |
+| :--- | :--- | :--- |
+| **Base-RAG** | `base` | Standard dense retrieval |
+| **Hybrid BM25** | `hybrid` | Combined dense and sparse (BM25) |
+| **Reranker** | `reranker` | Cross-encoder reranking |
+| **HyDE** | `hyde` | Hypothetical Document Embeddings |
+| **Summarization** | `summarization` | Retrieval on summarized context |
+| **SumContext** | `summarization_context` | Retrieval on summary, generation on full |
+| **Oracle** | `known_context` | Ground truth context provided |
+| **Zero-shot** | `no_context` | Pretrained knowledge only |
+
+---
 
 You can find more details about the benchmark in our [Paper](https://arxiv.org/abs/2506.12071), [Website](https://t2ragbench.demo.hcds.uni-hamburg.de/), and on the dataset on [Huggingface](https://huggingface.co/datasets/G4KMU/t2-ragbench).
 
-
-For more details on the benchmark, please refer to our paper, code or write us an email at t2ragbench@gmail.com.
+For more details on the benchmark, please refer to our paper or write us an email at t2ragbench@gmail.com.

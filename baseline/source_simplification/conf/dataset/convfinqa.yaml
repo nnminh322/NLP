@@ -1,5 +1,5 @@
-name: "G4KMU/convfinqa"
-runner_name: "G4KMU/convfinqa"
+name: "G4KMU/t2-ragbench"
+config_name: "ConvFinQA"
 split: "all_turn_0_generated"
 language: "en"
 meta_data_keys:

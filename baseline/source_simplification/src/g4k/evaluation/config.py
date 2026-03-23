@@ -25,6 +25,7 @@ class Dataset:
     """Dataset configuration."""
 
     name: str
+    config_name: str | None = None
     split: str
     language: str
     context_key: str
