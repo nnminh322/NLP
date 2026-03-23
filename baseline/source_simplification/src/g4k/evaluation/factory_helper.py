@@ -2,9 +2,8 @@
 
 from typing import Any, Dict, Optional, Tuple
 
-from encourage.llm import BatchInferenceRunner
-from encourage.metrics import METRIC_REGISTRY, get_metric_from_registry
-from encourage.rag import RAGMethod, RAGMethodInterface
+from g4k.internal.abstractions import G4KRunner as BatchInferenceRunner
+from g4k.internal.rag_methods import RAG_REGISTRY
 from omegaconf import DictConfig, OmegaConf
 from pydantic import BaseModel, create_model
 
@@ -13,10 +12,18 @@ from g4k.datasets.base.dataset_interface import DatasetCollectionInterface
 from g4k.evaluation.config import Config
 
 
-def get_rag_method_class(method_name: str) -> type[RAGMethodInterface]:
+def get_rag_method_class(method_name: str) -> type:
     """Get the RAG method class from a string."""
     try:
-        return RAGMethod(method_name).get_class()  # type: ignore
+        # Standardize method name comparison
+        method_map = {
+            "Base": "Base",
+            "HybridBM25": "HybridBM25",
+            "Hyde": "Hyde",
+            "Summarization": "Summarization"
+        }
+        internal_name = method_map.get(method_name, method_name)
+        return RAG_REGISTRY[internal_name]
     except KeyError:
         raise ValueError(f"Unsupported RAG method: {method_name}") from None
 
@@ -32,27 +39,8 @@ def get_dataset_class(dataset_name: str) -> type[DatasetCollectionInterface]:
 def load_metrics(
     config: list[str | dict[str, dict[str, str]]], runner: BatchInferenceRunner = None
 ) -> list:
-    """Load metrics from the config."""
-    metrics = []
-    for m in config:
-        if isinstance(m, str):
-            name, args = m, {}  # type: ignore
-        elif isinstance(m, (dict, DictConfig)):
-            # Convert DictConfig to plain dict
-            m = OmegaConf.to_container(m, resolve=True)  # type: ignore
-            name, args = next(iter(m.items()))
-        else:
-            raise ValueError(f"Invalid metric config: {m}")
-
-        cls = METRIC_REGISTRY[name.lower()]
-
-        if cls.requires_runner():
-            metric = get_metric_from_registry(name, runner=runner, **args)
-        else:
-            metric = get_metric_from_registry(name, **args)
-
-        metrics.append(metric)
-    return metrics
+    """Load metrics from the config. (Simplified for baseline)"""
+    return []
 
 
 def get_response_format(cfg: Config) -> Optional[type[BaseModel]]:

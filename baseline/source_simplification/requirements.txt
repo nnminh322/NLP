@@ -2,6 +2,7 @@
 langchain-core>=0.2.32
 langchain>=0.2.14
 langchain_huggingface>=0.0.3
+langchain_community
 python-dotenv>=1.0.1
 ragas==0.1.21
 PyYAML>=6.0.2
@@ -13,6 +14,9 @@ beautifulsoup4>=4.13.3
 omegaconf>=2.3.0
 pandas>=2.0.0
 pydantic>=2.0.0
+openai
+rank_bm25
+faiss-cpu
 
 # Runtime dependencies
 vllm>=0.6.0
@@ -21,10 +25,3 @@ transformers
 accelerate
 sentence-transformers
 uvicorn
-
-# Private dependencies
-# IMPORTANT: Colab users need to install this manually or use a token:
-# pip install git+https://<TOKEN>@git.dida.do/dida/encourage.git@main
-# Or if you have SSH access:
-# git+ssh://git@git.dida.do/dida/encourage.git@main
-# promote it to a separate command if it blocks other installs

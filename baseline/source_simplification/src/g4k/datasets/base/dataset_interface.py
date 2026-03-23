@@ -3,10 +3,7 @@
 from abc import ABC, abstractmethod
 
 import pandas as pd
-from encourage.llm import BatchInferenceRunner, ResponseWrapper
-from encourage.prompts.context import Document
-from encourage.prompts.meta_data import MetaData
-from encourage.rag import RAGMethodInterface
+from g4k.internal.abstractions import BatchInferenceRunner, ResponseWrapper, Document, MetaData, RAGMethodInterface
 from pydantic import BaseModel
 
 

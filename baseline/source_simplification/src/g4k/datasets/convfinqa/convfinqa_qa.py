@@ -2,8 +2,7 @@
 
 import json
 
-from encourage.llm import BatchInferenceRunner, ResponseWrapper
-from encourage.rag import RAGMethodInterface
+from g4k.internal.abstractions import BatchInferenceRunner, ResponseWrapper, RAGMethodInterface
 from pydantic import BaseModel
 
 from g4k.datasets.finqa.finqa_qa import FinQADatasetCollection
