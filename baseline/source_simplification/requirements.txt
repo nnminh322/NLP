@@ -23,5 +23,8 @@ sentence-transformers
 uvicorn
 
 # Private dependencies
-# NOTE: Access to this repository is required.
-git+ssh://git@git.dida.do/dida/encourage.git@main
+# IMPORTANT: Colab users need to install this manually or use a token:
+# pip install git+https://<TOKEN>@git.dida.do/dida/encourage.git@main
+# Or if you have SSH access:
+# git+ssh://git@git.dida.do/dida/encourage.git@main
+# promote it to a separate command if it blocks other installs
