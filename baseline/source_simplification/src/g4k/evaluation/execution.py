@@ -9,8 +9,7 @@ import mlflow.data.pandas_dataset
 import pandas as pd
 from datasets import load_dataset
 from dotenv import load_dotenv
-from g4k.internal.abstractions import BatchInferenceRunner, ResponseWrapper
-from vllm import SamplingParams
+from g4k.internal.abstractions import BatchInferenceRunner, ResponseWrapper, SamplingParams
 
 from g4k.evaluation.config import Config
 from g4k.evaluation.evaluation import main as evaluation

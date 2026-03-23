@@ -5,9 +5,7 @@ from pathlib import Path
 
 import hydra
 import mlflow
-from g4k.internal.abstractions import BatchInferenceRunner
-# from encourage.metrics import Metric, MetricOutput # Metrics are simplified for now
-from vllm import SamplingParams
+from g4k.internal.abstractions import BatchInferenceRunner, SamplingParams
 
 from g4k.evaluation.config import Config
 from g4k.evaluation.factory_helper import load_metrics

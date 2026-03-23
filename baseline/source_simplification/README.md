@@ -34,25 +34,18 @@ python download_data.py -m 2
 #### 3. Run Retrieval Baseline
 Run the standalone benchmarking script with the dataset and retrieval mode:
 ```bash
-python src/g4k/evaluation/benchmark_retrieval.py --dataset <DATASET> --mode <MODE>
+# Available datasets: finqa, convfinqa, tatqa
+# Available modes: base, hybrid, hyde, summarization
+python src/g4k/evaluation/benchmark_retrieval.py --dataset finqa --mode base
 ```
 
-**Available Datasets:**
-- `finqa`
-- `convfinqa`
-- `tatqa`
+**Mode Descriptions:**
+- `base`: Standard vector retrieval (FAISS).
+- `hybrid`: Combined Vector + BM25 (RankBM25).
+- `hyde`: Hypothetical Document Embeddings (Needs LLM API).
+- `summarization`: Retrieval on summarized context (Needs LLM API).
 
-**Available Modes:**
-| Mode Architecture | Argument (`--mode`) | Description |
-| :--- | :--- | :--- |
-| **Base-RAG** | `base` | Standard dense retrieval |
-| **Hybrid BM25** | `hybrid` | Combined dense and sparse (BM25) |
-| **Reranker** | `reranker` | Cross-encoder reranking |
-| **HyDE** | `hyde` | Hypothetical Document Embeddings |
-| **Summarization** | `summarization` | Retrieval on summarized context |
-| **SumContext** | `summarization_context` | Retrieval on summary, generation on full |
-| **Oracle** | `known_context` | Ground truth context provided |
-| **Zero-shot** | `no_context` | Pretrained knowledge only |
+*Note: For `hyde` and `summarization` modes, ensure you have an LLM server (vLLM or OpenAI) running and accessible via the `base_url` in your `.env` or config.*
 
 ---
 

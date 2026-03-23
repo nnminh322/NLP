@@ -8,6 +8,15 @@ import pandas as pd
 from pydantic import BaseModel
 
 @dataclass
+class SamplingParams:
+    """Mock for vllm.SamplingParams to avoid heavy dependency."""
+    temperature: float = 0.0
+    max_tokens: int = 512
+    # Add other common params if needed
+    top_p: float = 1.0
+    stop: List[str] = field(default_factory=list)
+
+@dataclass
 class Document:
     """Internal Document class."""
     page_content: str
