@@ -1,0 +1,6 @@
+collection_name: "finqa"
+top_k: 3
+# embedding_function: "Alibaba-NLP/gte-Qwen2-1.5B-instruct"
+embedding_function: "intfloat/multilingual-e5-large-instruct"
+# embedding_function: "NovaSearch/stella_en_1.5B_v5"
+# embedding_function: "Google"

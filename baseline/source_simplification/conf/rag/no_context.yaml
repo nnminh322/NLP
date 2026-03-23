@@ -1,0 +1,4 @@
+method: NoContext
+prompt: ""
+retrieval_only: False
+template_name: ./src/g4k/prompts/templates/llama3_finqa_doc.j2

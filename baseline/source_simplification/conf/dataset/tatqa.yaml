@@ -1,0 +1,20 @@
+name: "G4KMU/tat-dqa"
+runner_name: "G4KMU/flare-tatqa-german"
+split: "all_generated"
+language: "en"
+meta_data_keys:
+  - question
+  - answer_type
+  - company_name
+  - report_year
+context_key: "context"
+answer_key: "program_answer"
+retrieval_query: "Given a question about a company, retrieve relevant passages that answer the query."
+tool_name: ""
+sys_prompt_path: ./src/g4k/prompts/sys_prompts/finqa_new.yaml
+template_name: ./src/g4k/prompts/templates/llama3_finqa_doc.j2
+document_percentage: 1
+response_format:
+  reasoning_steps: list[str]
+  final_formula: str
+  computed_formula: str

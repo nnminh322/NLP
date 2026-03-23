@@ -1,0 +1,15 @@
+name: "G4KMU/finqa_pdf_extract"
+runner_name: "G4KMU/finqa_pdf_extract"
+split: "unstructured"
+language: "en"
+meta_data_keys:
+  - report_year
+  - page_number
+  - company_symbol
+  - company_name
+  - company_sector
+  - company_industry
+  - company_headquarters
+  - company_cik
+  - company_founded
+context_key: "context_mod"

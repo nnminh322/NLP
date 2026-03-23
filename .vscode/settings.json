@@ -1,0 +1,26 @@
+{
+    "latex-workshop.latex.tools": [
+        {
+            "name": "tectonic",
+            "command": "conda",
+            "args": [
+                "run",
+                "-n",
+                "master",
+                "tectonic",
+                "%DOC%"
+            ],
+            "env": {}
+        }
+    ],
+    "latex-workshop.latex.recipes": [
+        {
+            "name": "tectonic",
+            "tools": [
+                "tectonic"
+            ]
+        }
+    ],
+    "latex-workshop.latex.recipe.default": "tectonic",
+    "latex-workshop.view.pdf.viewer": "tab"
+}

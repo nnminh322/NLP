@@ -1,0 +1,8 @@
+# conf/model/phi35mini.yam
+model_name: "microsoft/Phi-3.5-mini-instruct"
+model_name_short: "phi-3.5-mini"
+gpu_memory_utilization: 0.8
+temperature: 0
+max_tokens: 1000
+top_p: 0.95
+max_model_len: 2000

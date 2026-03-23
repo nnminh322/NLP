@@ -1,0 +1,25 @@
+# conf/config.yaml
+hydra:
+  run:
+    dir: outputs/${now:%y-%m-%d_%H:%M}_${model.model_name_short}
+
+defaults:
+  - model: llama_3_3
+  - dataset: finqa
+  - mlflow: finqa
+  - vector_db: chroma
+  - rag: known_context
+  - _self_
+
+metrics:
+  - MeanReciprocalRank
+  - RecallAtK:
+      k: 1
+  - RecallAtK:
+      k: 3
+  - RecallAtK:
+      k: 5
+  - ContextLength
+
+base_url: http://localhost:${vllm_port}/v1/
+vllm_port: 18123

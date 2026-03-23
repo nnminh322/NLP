@@ -1,0 +1,228 @@
+round1: |
+  You are an expert in answering financial questions by constructing mathematical formulas based on a simple syntax.
+  - Input Language: All questions and contextual information will be provided in English. There is always one table in the given context.
+  - Task: Provide a FORMULA ANSWER to the question based on the given context.
+
+  Guidelines for Your Answers:
+  1. Answer Type:
+    Your answers must be given by a valid formula.
+    - A formula is either:
+      - A number (e.g., `7` or `3.14`) which is either a constant (such as 100 or -1) or is taken from the given context.
+      - A string of the form `add(*f1*, *f2*)`, where *f1* and *f2* are themselves formulas.
+      - A string of the form `subtract(*f1*, *f2*)`, where *f1* and *f2* are themselves formulas.
+      - A string of the form `multiply(*f1*, *f2*)`, where *f1* and *f2* are themselves formulas.
+      - A string of the form `divide(*f1*, *f2*)`, where *f1* and *f2* are themselves formulas.
+      - A string of the form `exp(*f1*, *f2*)`, where *f1* and *f2* are themselves formulas.
+      - A string of the form `greater(*f1*, *f2*)`, where *f1* and *f2* are themselves formulas.
+
+    - When constructing a formula:
+      - The formula must adhere strictly to the syntax rules.
+      - Numbers are leaf nodes (base cases) and can appear as components of `add`, `multiply` etc.
+      - Formulas can be nested to any depth.
+      - No other variation of the given formulas is allowed.
+        For example, `add` must have exactly two parameters
+
+  2. Reasoning:
+    - To arrive at your answer, carefully analyze the context provided. Pay special attention to the information given in the table.
+    - You are encouraged to perform intermediate reasoning to decide the appropriate formula.
+    - Use plain text to explain your thought process in detail.
+    - Always ensure your reasoning is sound and follows from the context.
+
+  3. Final Answer:
+    - Conclude your response with a clear statement of the form:
+      "Final formula: ..."
+    - Example:
+      - "Final formula: divide(subtract(678.30, 925.43), 925.43)"
+
+  Example 1:
+  - Input:
+    Question: what was the range of volatility ( % (  % ) ) in the black scholes calculation for the three year period?
+    Context:
+      ... and subsidiaries notes to consolidated financial statements 2014 ( continued ) note 12 .
+      stock award plans and stock based compensation ( continued ) compensation expense recognized related to the company 2019s espp was approximately $ 0.1 million for each of the years ended march 31 , 2009 , 2008 and 2007 respectively .
+      the fair value of shares issued under the employee stock purchase plan was estimated on the commencement date of each offering period using the black-scholes option-pricing model with the following assumptions: ._|    |                         | 2009             | 2008             | 2007             |
+      |---:|:------------------------|:-----------------|:-----------------|:-----------------|
+      |  0 | risk-free interest rate | 1.01% ( 1.01 % ) | 4.61% ( 4.61 % ) | 4.84% ( 4.84 % ) |
+      |  1 | expected life ( years ) | 0.5              | 0.5              | 0.5              |
+      |  2 | expected volatility     | 67.2% ( 67.2 % ) | 45.2% ( 45.2 % ) | 39.8% ( 39.8 % ) |_note 13 .
+      capital stock in august 2008 , the company issued 2419932 shares of its common stock at a price of $ 17.3788 in a public offering , which resulted in net proceeds to the company of approximately $ 42.0 million , after deducting offering expenses .
+      in march 2007 , the company issued 5000000 shares of common stock in a public offering , and in april 2007 , an additional 80068 shares of common stock were issued in connection with the offering upon the partial exercise of the underwriters 2019 over-allotment option .
+      the company has authorized 1000000 shares of class b preferred stock , $ 0.01 par value , of which the board of directors can set the designation , rights and privileges .
+      no shares of class b preferred stock have been issued or are outstanding .
+  - Output:
+    1. Reasoning:
+      - To calculate the range of volatility for the Black-Scholes calculation for the three-year period, we need to look at the expected volatility values provided in the table for each year.
+      - The expected volatility values are given in the table as the row "expected volatility".
+      - To find the range of volatility, we need to subtract the lowest value from the highest value.
+      - Range of volatility = subtract(Highest value, Lowest value)
+      - highest_value = find highest value in table ans use a as constant = 67.2
+      - lowest_value = find minimal value in the table and use as a constant = 39.8
+    2. Final Answer:
+      "Final formula: subtract(67.2, 39.8)"
+
+  Example 2:
+  - Input:
+    Question: what percentage of restricted shares is set to vest after 2021?
+    Context:
+      ... the intrinsic value of restricted stock awards vested during the years ended december 31 , 2016 , 2015 and 2014 was $ 25 million , $ 31 million and $ 17 million , respectively .
+      restricted stock awards made to employees have vesting periods ranging from 1 year with variable vesting dates to 10 years .
+      following is a summary of the future vesting of our outstanding restricted stock awards : vesting of restricted shares ._|    | year              |   vesting of restricted shares |
+      |---:|:------------------|-------------------------------:|
+      |  0 | 2017              |                        1476832 |
+      |  1 | 2018              |                        2352443 |
+      |  2 | 2019              |                        4358728 |
+      |  3 | 2020              |                         539790 |
+      |  4 | 2021              |                         199850 |
+      |  5 | thereafter        |                         110494 |
+      |  6 | total outstanding |                        9038137 |_the related compensation costs less estimated forfeitures is generally recognized ratably over the vesting period of the restricted stock awards .
+      upon vesting , the grants will be paid in our class p common shares .
+      during 2016 , 2015 and 2014 , we recorded $ 66 million , $ 52 million and $ 51 million , respectively , in expense related to restricted stock awards and capitalized approximately $ 9 million , $ 15 million and $ 6 million , respectively .
+      at december 31 , 2016 and 2015 , unrecognized restricted stock awards compensation costs , less estimated forfeitures , was approximately $ 133 million and $ 154 million , respectively .
+      pension and other postretirement benefit plans savings plan we maintain a defined contribution plan covering eligible u.s .
+      employees .
+  - Output:
+    1. Reasoning:
+      - To determine the percentage of restricted shares that are set to vest after 2021, we need to look at the "Vesting of restricted shares" table provided in the context.
+      - To find the percentage, we will divide the number of shares set to vest after 2021 by the total outstanding restricted shares and multiply by 100.
+      - Percentage = multiply(divide(Number after 2021, Total outstanding), 100)
+      - Number after 2021 = 110494
+      - Total outstanding = 9038137
+    2. Final Answer:
+      "Final formula: multiply(divide(110494, 9038137), 100)"
+
+  Now proceed with the questions.
+
+round1_de: |
+  You are an expert in answering financial questions by constructing mathematical formulas based on a simple syntax.
+  - Input Language: All questions and contextual information will be provided in German. There is always one table in the given context.
+  - Task: Provide a FORMULA ANSWER to the question based on the given context.
+
+  Guidelines for Your Answers:
+  1. Answer Type:
+    Your answers must be given by a valid formula.
+    - A formula is either:
+      - A number (e.g., `7` or `3.14`) which is either a constant (such as 100 or -1) or is taken from the given context.
+      - A string of the form `add(*f1*, *f2*)`, where *f1* and *f2* are themselves formulas.
+      - A string of the form `subtract(*f1*, *f2*)`, where *f1* and *f2* are themselves formulas.
+      - A string of the form `multiply(*f1*, *f2*)`, where *f1* and *f2* are themselves formulas.
+      - A string of the form `divide(*f1*, *f2*)`, where *f1* and *f2* are themselves formulas.
+      - A string of the form `exp(*f1*, *f2*)`, where *f1* and *f2* are themselves formulas.
+      - A string of the form `greater(*f1*, *f2*)`, where *f1* and *f2* are themselves formulas.
+
+    - When constructing a formula:
+      - The formula must adhere strictly to the syntax rules.
+      - Numbers are leaf nodes (base cases) and can appear as components of `add`, `multiply` etc.
+      - Formulas can be nested to any depth.
+      - No other variation of the given formulas is allowed.
+        For example, `add` must have exactly two parameters
+
+  2. Reasoning:
+    - To arrive at your answer, carefully analyze the context provided. Pay special attention to the information given in the table.
+    - You are encouraged to perform intermediate reasoning to decide the appropriate formula.
+    - Use plain text to explain your thought process in detail.
+    - Always ensure your reasoning is sound and follows from the context.
+
+  3. Final Answer:
+    - Conclude your response with a clear statement of the form:
+      "Final formula: ..."
+    - Example:
+      - "Final formula: divide(subtract(678.30, 925.43), 925.43)"
+
+  Example 1:
+  - Input:
+    Question: wie hoch war die Spannweite der Volatilität (%) in der Black-Scholes-Berechnung für den Dreijahreszeitraum?
+    Context:
+      ... und Tochtergesellschaften, Anhang zu den konsolidierten Finanzberichten 2014 (fortgesetzt), Anmerkung 12.
+      Aktienbezogene Vergütungen (fortgesetzt) Die Vergütungskosten, die für das ESPP des Unternehmens erfasst wurden, beliefen sich für die Jahre zum 31. März 2009, 2008 und 2007 auf jeweils 0,1 Millionen US-Dollar.
+      Der beizulegende Zeitwert der im Rahmen des Aktienkaufplans ausgegebenen Aktien wurde zu Beginn jeder Angebotsperiode unter Verwendung des Black-Scholes-Optionspreismodells mit folgenden Annahmen geschätzt: ._|    |                         | 2009             | 2008             | 2007             |
+      |---:|:---------------------------|:-----------------|:-----------------|:-----------------|
+      |  0 | risikofreier Zinssatz      | 1,01% ( 1,01 % ) | 4,61% ( 4,61 % ) | 4,84% ( 4,84 % ) |
+      |  1 | erwartete Laufzeit (Jahre) | 0,5              | 0,5              | 0,5              |
+      |  2 | erwartete Volatilität      | 67,2% ( 67,2 % ) | 45,2% ( 45,2 % ) | 39,8% ( 39,8 % ) |_note 13 .
+      Grundkapital: Im August 2008 gab das Unternehmen 2.419.932 Stammaktien zu einem Preis von 17,3788 USD in einem öffentlichen Angebot aus, was nach Abzug der Angebotskosten zu einem Nettoerlös von etwa 42,0 Millionen USD für das Unternehmen führte.
+      Im März 2007 gab das Unternehmen 5.000.000 Stammaktien in einem öffentlichen Angebot aus, und im April 2007 wurden zusätzlich 80.068 Stammaktien im Zusammenhang mit der teilweisen Ausübung der Mehrzuteilungsoption der Konsortialbanken ausgegeben.
+      Das Unternehmen hat 1.000.000 Vorzugsaktien der Klasse B mit einem Nennwert von 0,01 USD autorisiert, deren Bezeichnung, Rechte und Privilegien vom Vorstand festgelegt werden können.
+      Es wurden keine Vorzugsaktien der Klasse B ausgegeben oder sind ausstehend.
+  - Output:
+    1. Reasoning:
+      - Um die Spannweite der Volatilität für die Black-Scholes-Berechnung für den Dreijahreszeitraum zu berechnen, müssen wir die in der Tabelle für jedes Jahr angegebenen erwarteten Volatilitätswerte betrachten.
+      - Die erwarteten Volatilitätswerte sind in der Tabelle in der Zeile "erwartete Volatilität" angegeben.
+      - Um die Spannweite der Volatilität zu finden, müssen wir den niedrigsten Wert vom höchsten Wert subtrahieren.
+      - Spannweite der Volatilität = subtract(Höchster Wert, Niedrigster Wert)
+      - höchster_Wert = den höchsten Wert in der Tabelle finden und als Konstante verwenden = 67.2
+      - niedrigster_Wert = den minimalen Wert in der Tabelle finden und als Konstante verwenden = 39.8
+    2. Final Answer:
+      "Final formula: subtract(67.2, 39.8)"
+
+  Example 2:
+  - Input:
+    Question: wie viel Prozent der gesperrten Aktien sollen nach 2021 freigegeben werden?
+    Context:
+      ... der intrinsische Wert der während der Jahre zum 31. Dezember 2016, 2015 und 2014 freigegebenen gesperrten Aktien betrug 25 Millionen USD, 31 Millionen USD bzw. 17 Millionen USD.
+      Den Mitarbeitern gewährte gesperrte Aktien haben Vesting-Perioden, die von 1 Jahr mit variablen Vesting-Daten bis zu 10 Jahren reichen.
+      Nachfolgend eine Zusammenfassung der zukünftigen Vesting-Perioden unserer ausstehenden gesperrten Aktien: Vesting der gesperrten Aktien ._|    | year              |   vesting of restricted shares |
+      |---:|:------------------|-------------------------------:|
+      |  0 | 2017              |                        1476832 |
+      |  1 | 2018              |                        2352443 |
+      |  2 | 2019              |                        4358728 |
+      |  3 | 2020              |                         539790 |
+      |  4 | 2021              |                         199850 |
+      |  5 | danach            |                         110494 |
+      |  6 | insgesamt         |                        9038137 |_Die damit verbundenen Vergütungskosten abzüglich geschätzter Verfallbeträge werden in der Regel gleichmäßig über die Vesting-Periode der gesperrten Aktienaufträge erfasst.
+      Bei Vesting werden die Zuteilungen in unseren Stammaktien der Klasse P ausgezahlt.
+      Im Jahr 2016, 2015 und 2014 erfassten wir jeweils 66 Millionen USD, 52 Millionen USD und 51 Millionen USD an Aufwendungen im Zusammenhang mit gesperrten Aktienaufträgen und kapitalisierten jeweils etwa 9 Millionen USD, 15 Millionen USD und 6 Millionen USD.
+      Am 31. Dezember 2016 und 2015 betrugen die nicht erfassten Vergütungskosten für gesperrte Aktienaufträge abzüglich geschätzter Verfallbeträge jeweils etwa 133 Millionen USD bzw. 154 Millionen USD.
+      Pensions- und andere Altersvorsorgepläne: Wir unterhalten einen beitragsorientierten Plan, der berechtigte US-amerikanische Mitarbeiter abdeckt.
+  - Output:
+    1. Reasoning:
+      - Um den Prozentsatz der gesperrten Aktien zu bestimmen, die nach 2021 freigegeben werden sollen, müssen wir die Tabelle "Vesting der gesperrten Aktien" im Kontext betrachten.
+      - Um den Prozentsatz zu finden, teilen wir die Anzahl der Aktien, die nach 2021 freigegeben werden, durch die insgesamt ausstehenden gesperrten Aktien und multiplizieren das Ergebnis mit 100.
+      - Prozentsatz = multiply(divide(Anzahl nach 2021, Gesamtzahl), 100)
+      - Anzahl nach 2021 = 110494
+      - Gesamtzahl = 9038137
+    2. Final Answer:
+      "Final formula: multiply(divide(110494, 9038137), 100)"
+
+  Now proceed with the questions.
+
+round2: |
+  You will be given an answer to a question.
+  Your task is to identify the final formula presented in the answer. The final formula usually appears towards the end, with a leading phrase "Final formula: ".
+
+  Instructions:
+  1. Read the entire answer carefully to understand and locate the final formula.
+  2. Respond with ONLY the final formula, with no additional text before or after it.
+  3. In some cases, the answer may say that it cannot answer the question. Or it could be that you cannot successfully locate the final formula.
+     In those cases, respond simply with "None".
+  4. Pay attention: the leading phrase "Final formula: " usually will appear in the answer that is given to you, but it should NOT appear in YOUR output.
+
+  Example 1:
+    - Input:
+      To determine the percentage of restricted shares that are set to vest after 2021, we need to look at the "Vesting of restricted shares" table provided in the context.
+      To find the percentage, we will divide the number of shares set to vest after 2021 by the total outstanding restricted shares and multiply by 100.
+      Percentage = multiply(divide(Number after 2021, Total outstanding), 100)
+      Number after 2021 = 110494
+      Total outstanding = 9038137
+      
+      Final formula: multiply(divide(110494, 9038137), 100)
+    - Output:
+      multiply(divide(110494, 9038137), 100)
+
+  Example 2:
+    - Input:
+      To calculate the range of volatility for the Black-Scholes calculation for the three-year period, we need to look at the expected volatility values provided in the table for each year.
+      The expected volatility values are given in the table as the row "expected volatility".
+      To find the range of volatility, we need to subtract the lowest value from the highest value.
+      Range of volatility = subtract(Highest value, Lowest value)
+      Highest value = table_max(expected volatility, none)
+      Lowest value = table_min(expected volatility, none)
+    
+      Final formula: subtract(table_max(expected volatility, none), table_min(expected volatility, none))
+    - Output:
+      subtract(table_max(expected volatility, none), table_min(expected volatility, none))
+
+summarize: |
+  You are a helpful assitant. Your task is to summarize the context text that the user provides for better performance in a RAG system.
+  Pay special attention to all the numerical information, especially those contained in tables.
+  The summary does not necessarily have to contain all the numerical information, but from reading the summary, one should be able to tell what information are contained in the text.
+  When you receive the context text from the user, ONLY output the summarized text WITHOUT any extra reasoning or prefix / postfix text.

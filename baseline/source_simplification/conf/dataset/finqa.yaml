@@ -1,0 +1,25 @@
+name: "G4KMU/finqa-german"
+runner_name: "G4KMU/finqa"
+split: "dev_generated+train_generated+test_generated"
+language: "en"
+meta_data_keys:
+  - report_year
+  - page_number
+  - company_symbol
+  - company_name
+  - company_sector
+  - company_industry
+  - company_headquarters
+  - company_cik
+  - company_founded
+context_key: "context"
+answer_key: "program_answer"
+retrieval_query: "Given a question about a company, retrieve relevant passages that answer the query."
+tool_name: ""
+sys_prompt_path: ./src/g4k/prompts/sys_prompts/finqa_new.yaml
+template_name: ./src/g4k/prompts/templates/llama3_finqa_doc.j2
+document_percentage: 1
+response_format:
+  reasoning_steps: list[str]
+  final_formula: str
+  computed_formula: str

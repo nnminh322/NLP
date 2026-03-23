@@ -1,0 +1,12 @@
+# conf/model/llama_3_3_dida.yaml
+# model copied from huggingface: casperhansen/llama-3.3-70b-instruct-awq
+model_name: "kosbu/Llama-3.3-70B-Instruct-AWQ"
+model_name_short: "llama3.3-70B-Instruct-AWQ"
+gpu_memory_utilization: 0.95
+temperature: 0
+max_tokens: 1000
+top_p: 0.98
+max_model_len: 40000
+tensor_parallel_size: 1
+quantization: "awq_marlin"
+tool_call_parser: llama3_json

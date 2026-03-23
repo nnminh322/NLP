@@ -1,0 +1,19 @@
+name: "G4KMU/t2-ragbench"
+runner_name: "G4KMU/finqa"
+split: "finqa+convfinqa+vaqa+tatdqa"
+language: "en"
+meta_data_keys:
+  - report_year
+  - company_name
+  - company_sector
+context_key: "context"
+answer_key: "answer"
+retrieval_query: "Given a question about a company, retrieve relevant passages that answer the query."
+tool_name: ""
+sys_prompt_path: ./src/g4k/prompts/sys_prompts/finqa_new.yaml
+template_name: ./src/g4k/prompts/templates/llama3_finqa_doc.j2
+document_percentage: 1
+response_format:
+  reasoning_steps: list[str]
+  final_formula: str
+  computed_formula: str

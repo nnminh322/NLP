@@ -1,0 +1,121 @@
+[project]
+name = "g4k"
+version = "0.1.3"
+description = "g4kmu"
+readme = "README.md"
+requires-python = ">= 3.12.4"
+authors = [{ name = "", email = "" }]
+dependencies = [
+    "langchain-core>=0.2.32",
+    "langchain>=0.2.14",
+    "langchain_huggingface>=0.0.3",
+    "python-dotenv>=1.0.1",
+    "ragas==0.1.21",
+    "PyYAML>=6.0.2",
+    "types-PyYAML>=6.0.12",
+    "types-requests>=2.32.0",
+    "tqdm>=4.66.4",
+    "pre-commit>=4.0.1",
+    "hydra-core>=1.3.2",
+    "encourage>=0.2.2",
+    "pip-licenses>=5.0.0",
+    "googletrans>=2.4.0",
+    "datasets>=3.5.0",
+    "mlflow>=2.17.2",
+    "waybackpy>=3.0.6",
+    "beautifulsoup4>=4.13.3",
+]
+
+
+[project.optional-dependencies]
+dev = [
+    "ipywidgets>=8.1.5",
+    "jupyterlab>=4.0",
+    "jupytext>=1.16.3",
+    "notebook>=7.0",
+    "matplotlib>=3.9.1",
+    "nbconvert[webpdf]>=7.16.4",
+]
+ci = [
+    "ruff>=0.7.1",
+    "isort>=5.13.2",
+    "mypy>=1.13.0",
+    "pytest>=8.3.3",
+    "pytest-cov>=6.0.0",
+    "pytest-mock>=3.14.0",
+]
+
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["g4k*"]
+
+[tool.mypy]
+# Uncomment the following if you use Pydantic in the project
+# plugins = ["pydantic.mypy"]
+show_error_codes = true
+disallow_incomplete_defs = true
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_return_any = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = "g4k.*"
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = "src/tests"
+addopts = "-v -ra --cov=g4k"
+pythonpath = ["."]
+
+[tool.isort]
+profile = "black"
+
+[tool.ruff]
+line-length = 100
+lint.select = ["E", "F", "W", "I", "D", "A", "N", "B", "SIM", "C4", "TID"]
+lint.ignore = [
+    "E741", # Ambiguous variable name
+    "D213", # Multi-line docstring summary should start at the second line
+    "D105", # Missing docstring in magic method
+    "D107", # Missing docstring in __init__
+    "D203", # 1 blank line required before class docstring
+    "D401", # First line should be in imperative mood; try rephrasing
+    "D407", # Missing dashed underline after section
+    "D406", # Section name should end with a newline
+    "D106", # Missing docstring in public nested class
+    "B006", # Do not use mutable data structures for argument defaults
+    "B008", # Do not perform function calls in argument defaults
+    "B905", # `zip()` without an explicit `strict=` parameter
+]
+lint.exclude = ["*.ipynb"] # TODO: do we really want this?
+
+[tool.ruff.format]
+exclude = ["*.ipynb"]
+
+[tool.ruff.lint.per-file-ignores]
+"test_*.py" = ["D", "E402"]
+"__init__.py" = ["D"]
+"src/notebooks/*.py" = [
+    "D",      # Make docstrings entirely optional
+    "E402",   # Module level import not at top of file
+    "SIM115", # Use context handler for opening files
+    "I",      # Allow unordered imports
+]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.jupytext]
+# Always pair ipynb notebooks to py:percent files
+formats = ["ipynb", "py:percent"]
+
+[tool.uv.sources]
+encourage = { git = "", branch = "main" }
+
+[dependency-groups]
+dev = ["ipywidgets>=8.1.5"]

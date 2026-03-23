@@ -1,0 +1,19 @@
+name: "G4KMU/finqa-german"
+runner_name: "finqa-finetuned"
+split: "dev"
+language: "en"
+meta_data_keys:
+  - report_year
+  - page_number
+  - company_symbol
+  - company_name
+  - company_sector
+  - company_industry
+  - company_headquarters
+  - company_cik
+  - company_founded
+context_key: "context"
+answer_key: "program_answer"
+retrieval_query: "Given a question about a company, retrieve relevant passages that answer the query."
+tool_name: ""
+sys_prompt_path: ./src/g4k/prompts/sys_prompts/finqa.yaml

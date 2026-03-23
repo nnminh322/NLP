@@ -1,0 +1,155 @@
+% !TEX program = xelatex
+\documentclass[12pt,a4paper]{article}
+\usepackage{geometry}
+\geometry{left=2.5cm,right=2cm,top=2cm,bottom=2cm}
+\usepackage{fontspec}
+\setmainfont{Times New Roman}
+\usepackage[vietnamese]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\hypersetup{hidelinks}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\titleformat{\section}{\large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{1em}{}
+
+\begin{document}
+
+\begin{center}
+{\large \textbf{TRƯỜNG CÔNG NGHỆ THÔNG TIN VÀ TRUYỀN THÔNG}}\\
+{\large \textbf{ĐẠI HỌC BÁCH KHOA HÀ NỘI}}\\[0.5cm]
+{\large \textbf{MÔN: XỬ LÝ NGÔN NGỮ TỰ NHIÊN}}\\[0.5cm]
+{\large \textbf{ĐỀ XUẤT ĐỀ TÀI NGHIÊN CỨU}}\\[0.5cm]
+{\Large \textbf{Đánh giá và Đề xuất Phương pháp Truy xuất Thông tin Đa phương thức}}\\
+{\Large \textbf{trong Hệ thống RAG Lĩnh vực Tài chính}}\\[0.5cm]
+{\large Giảng viên hướng dẫn: TS. Nguyễn Kiêm Hiếu}\\[0.2cm]
+{\large Nhóm sinh viên thực hiện:}\\
+{\large 20252011 – Lê Hữu Thành}\\
+{\large 20252184 – Nguyễn Nhật Minh}\\
+{\large 20252185 – Nguyễn Đăng Huy}\\[0.5cm]
+{\large Hà Nội, \today}
+\end{center}
+
+\section{Giới thiệu bài toán và vấn đề}
+
+Hệ thống Hỏi đáp Tăng cường Truy xuất (Retrieval-Augmented Generation – RAG) trong lĩnh vực công nghệ tài chính (Fintech) có giá trị ứng dụng cao trong việc tự động hóa quá trình tra cứu thông tin từ khối lượng lớn báo cáo chuyên ngành. Trong kiến trúc RAG, chất lượng của mô-đun truy xuất (retriever) đóng vai trò then chốt, quyết định giới hạn hiệu suất của toàn bộ hệ thống; mô-đun sinh văn bản (generator) không có khả năng sửa chữa các sai lệch từ pha truy xuất. Do đó, việc xây dựng một retriever tối ưu hóa cho miền dữ liệu tài chính là yêu cầu bắt buộc để đảm bảo tính chính xác và độ tin cậy của thông tin đầu ra.
+
+\textbf{Mô hình hóa bài toán (Information Retrieval Task):}
+\begin{itemize}
+    \item \textbf{Input:} Một truy vấn ngôn ngữ tự nhiên $q$ (câu hỏi của người dùng).
+    \item \textbf{Output:} Một danh sách các định danh tài liệu $D = [id_1, id_2, ..., id_k]$ được trích xuất và xếp hạng từ một kho ngữ liệu (corpus) $\mathcal{C}$.
+    \item \textbf{Đánh giá:} Hiệu suất được đo lường thông qua mức độ trùng khớp giữa danh sách dự đoán và danh sách nhãn đúng (ground truth), sử dụng các độ đo như Mean Reciprocal Rank (MRR) và Normalized Discounted Cumulative Gain (NDCG).
+\end{itemize}
+
+\subsection{Các thách thức kỹ thuật của bài toán}
+
+Việc truy xuất ngữ liệu tài chính tồn tại nhiều rào cản đặc thù làm giảm hiệu suất của các mô hình ngôn ngữ phổ quát:
+
+\begin{itemize}
+    \item \textbf{Cấu trúc dữ liệu phức tạp:} Báo cáo tài chính chứa lượng lớn dữ liệu bán cấu trúc (bảng biểu). Các ma trận số liệu này dễ bị đứt gãy tính liên kết logic toán học khi chuyển đổi thành định dạng chuỗi tuyến tính.
+    \item \textbf{Đặc thù ngôn ngữ học:} Văn bản có mật độ cao các từ viết tắt, thuật ngữ chuyên ngành hẹp (ví dụ: EBITDA, ROA, EPS) và cấu trúc câu phức tạp.
+    \item \textbf{Đồng nghĩa và sự nhạy cảm về số liệu:} Các văn bản có cấu trúc từ vựng giống nhau đến 90\% nhưng khác biệt về các chỉ số định lượng (như “tăng 5\%” so với “giảm 5\%”, hoặc khác biệt về năm tài chính) tạo ra các mẫu âm tính khó (hard negatives) gây nhiễu không gian vector.
+    \item \textbf{Hạn chế của các mô hình nhúng phổ quát:} Các mô hình embedding được huấn luyện trên văn bản tổng quát thường không phân biệt được sự khác biệt mang tính định lượng, dẫn đến độ tương đồng sai lệch.
+\end{itemize}
+
+\section{Tập dữ liệu huấn luyện và kiểm tra}
+
+Nghiên cứu sử dụng tập dữ liệu $\mathbf{T}^2$-RAGBench \cite{strich2026t2ragbench}, được chấp nhận xuất bản tại hội nghị EACL 2026 (European Chapter of the Association for Computational Linguistics). Đây là một bộ dữ liệu đa phương thức (văn bản và bảng biểu) trong lĩnh vực tài chính, được xây dựng từ ba tập dữ liệu gốc: FinQA, ConvFinQA và TAT-DQA.
+
+\textbf{Cấu trúc dữ liệu:}
+\begin{itemize}
+    \item \textbf{Corpus:} 7.318 tài liệu tài chính dạng text+table, tổng cộng 924.2 token trung bình mỗi tài liệu.
+    \item \textbf{Queries:} 23.088 câu hỏi đã được cải tiến để trở nên \textit{context-independent} (có duy nhất một đáp án đúng, không phụ thuộc vào ngữ cảnh cung cấp).
+    \item \textbf{Qrels:} Tệp đối chiếu chuẩn hóa (query – document – relevance score) theo định dạng của bài toán truy xuất thông tin (IR).
+\end{itemize}
+
+\textbf{Hiện trạng nghiên cứu (SOTA trên tập dữ liệu):}
+Theo báo cáo của $T^2$-RAGBench, phương pháp Hybrid BM25 (kết hợp tìm kiếm thưa BM25 và tìm kiếm vector dày đặc) đạt kết quả tốt nhất trên pha truy xuất với các chỉ số trung bình có trọng số:
+\begin{itemize}
+    \item MRR@3: 35,2\%
+    \item Recall@3: 49,4\%
+\end{itemize}
+Ngay cả các mô hình embedding mạnh nhất (OpenAI text-embedding-3-large) cũng chỉ đạt MRR@5 khoảng 44,7\%. Đáng chú ý, chưa có phương pháp nào được đề xuất riêng cho pha truy xuất trên benchmark này; các kết quả hiện tại chỉ là các baseline (BM25, dense retrieval, hybrid) do nhóm tác giả báo cáo. Điều này tạo ra cơ hội nghiên cứu rõ ràng: đề xuất một phương pháp truy xuất chuyên biệt cho tài liệu tài chính đa phương thức.
+
+\section{Giới thiệu phương pháp đề xuất}
+
+Dựa trên các thách thức đã phân tích, nhóm đề xuất một hướng tiếp cận nhằm khắc phục điểm yếu của các phương pháp truy xuất hiện có. Cụ thể:
+
+\begin{itemize}
+    \item \textbf{Phân tích sai số chuyên sâu:} Trước tiên, nhóm sẽ tiến hành đánh giá chi tiết các baseline (BM25, dense retrieval, hybrid search) trên bộ dữ liệu $T^2$-RAGBench để xác định các nguyên nhân thất bại phổ biến, đặc biệt liên quan đến xử lý bảng biểu, các mẫu âm tính khó và sự nhạy cảm với số liệu.
+    \item \textbf{Đề xuất cải tiến dựa trên đặc thù dữ liệu:} Từ kết quả phân tích, nhóm sẽ thiết kế các cải tiến tập trung vào một hoặc nhiều khía cạnh như:
+    \begin{itemize}
+        \item Cải thiện cách biểu diễn bảng biểu để bảo toàn cấu trúc và thông tin số học.
+        \item Điều chỉnh hàm mất mát hoặc chiến lược huấn luyện để tăng độ phân biệt với các mẫu âm tính khó.
+        \item Áp dụng cơ chế xếp hạng lại (re-ranking) phù hợp với đặc thù tài liệu tài chính.
+    \end{itemize}
+    \item \textbf{Đánh giá và so sánh:} Phương pháp đề xuất sẽ được thực nghiệm trên cùng bộ dữ liệu và độ đo, so sánh với các baseline để chứng minh tính hiệu quả.
+\end{itemize}
+
+Hướng tiếp cận này mang tính mở, cho phép nhóm linh hoạt lựa chọn giải pháp cụ thể sau khi có kết quả phân tích sai số thực tế.
+
+\section{Kế hoạch thực hiện cụ thể theo tuần}
+
+Thời gian dự kiến: 4 tuần (từ 22/03/2026 đến 19/04/2026).
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{|p{2.5cm}|p{9cm}|p{3cm}|}
+\hline
+\textbf{Tuần} & \textbf{Công việc} & \textbf{Deliverables} \\ \hline
+1 & - Thu thập và tái cấu trúc dữ liệu $T^2$-RAGBench thành chuẩn IR (corpus, queries, qrels).\\
+& - Thiết lập mã nguồn đo lường (MRR, NDCG).\\
+& - Xây dựng pipeline cho baseline BM25 (lexical search). & - Pipeline cơ bản hoàn chỉnh.\\
+& & - Kết quả BM25 baseline. \\ \hline
+2 & - Triển khai các mô hình dense retrieval (BGE-M3, E5-Mistral).\\
+& - Triển khai hybrid search (BM25 + dense).\\
+& - Thu thập và lưu trữ kết quả xếp hạng. & - Kết quả của dense retrieval và hybrid.\\
+& & - Bảng số liệu so sánh ban đầu. \\ \hline
+3 & - Phân tích sai số (error analysis) trên kết quả của các baseline.\\
+& - Xác định các nguyên nhân lỗi chính (mù số học, sai cấu trúc bảng, hard negatives).\\
+& - Khảo sát luật ngôn ngữ của dataset (từ viết tắt, từ chuyên ngành). & - Báo cáo phân tích lỗi.\\
+& & - Danh sách các mẫu truy vấn thất bại. \\ \hline
+4 & - Xây dựng và thử nghiệm phương pháp đề xuất dựa trên phân tích.\\
+& - Đối chiếu kết quả với baseline.\\
+& - Hoàn thiện báo cáo cuối cùng và slide thuyết trình. & - Code phương pháp đề xuất.\\
+& & - Bảng so sánh kết quả cuối.\\
+& & - Báo cáo hoàn chỉnh, slide. \\ \hline
+\end{tabular}
+\end{table}
+
+\section{Phân chia công việc theo thành viên}
+
+\begin{itemize}
+    \item \textbf{Nguyễn Nhật Minh (20252184M):} 
+    \begin{itemize}
+        \item Xây dựng pipeline đánh giá, triển khai các baseline (BM25, dense, hybrid).
+        \item Phân tích sai số, đề xuất cải tiến.
+        \item Thực hiện thử nghiệm và đối chiếu kết quả.
+    \end{itemize}
+    \item \textbf{Lê Hữu Thành (20252011M):} 
+    \begin{itemize}
+        \item Đọc hiểu tài liệu, thiết lập môi trường, hỗ trợ triển khai baseline.
+        \item Phân tích luật ngôn ngữ của dataset (từ viết tắt, từ chuyên ngành).
+        \item Soạn thảo báo cáo và slide.
+    \end{itemize}
+    \item \textbf{Nguyễn Đăng Huy (20252185M):} 
+    \begin{itemize}
+        \item Trích xuất tự động các mẫu truy vấn bị xếp hạng sai.
+        \item Tổng hợp số liệu, kiểm tra tính nhất quán.
+        \item Hỗ trợ hoàn thiện báo cáo và chuẩn bị thuyết trình.
+    \end{itemize}
+\end{itemize}
+
+\section*{Tài liệu tham khảo}
+\begin{thebibliography}{1}
+\bibitem{strich2026t2ragbench}
+Jan Strich, Enes Kutay Isgorur, Maximilian Trescher, Chris Biemann, Martin Semmann.
+“$\mathbf{T}^2$-RAGBench: Text-and-Table Benchmark for Evaluating Retrieval-Augmented Generation”.
+\textit{Proceedings of the 2026 Conference of the European Chapter of the Association for Computational Linguistics (EACL 2026)}.
+\end{thebibliography}
+
+\end{document}
