@@ -20,12 +20,12 @@ class TatQADatasetSample(BaseModel):
     program_answer: str
     answer_type: str
     derivation: str
-    page_numbers: Optional[int] = None
+    page_numbers: Optional[Any] = None
     context_id: Optional[str] = None
     context: Optional[str] = None
     company_name: Optional[str] = None
     company_sector: Optional[str] = None
-    report_year: Optional[str] = None
+    report_year: Optional[Any] = None
 
 
 class TatQADatasetCollection(DatasetCollectionInterface):

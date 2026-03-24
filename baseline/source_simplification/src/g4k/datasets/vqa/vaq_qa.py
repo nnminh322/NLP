@@ -29,9 +29,9 @@ class VAQDatasetSample(BaseModel):
     company_sector: Optional[str] = None
     company_industry: Optional[str] = None
     company_headquarters: Optional[str] = None
-    company_date_added: Optional[str] = None
-    company_cik: Optional[float] = None
-    company_founded: Optional[str] = None
+    company_date_added: Optional[Any] = None
+    company_cik: Optional[Any] = None
+    company_founded: Optional[Any] = None
     filepath: Optional[str] = None
     tables: Optional[Any] = None
     annotations: Optional[Any] = None

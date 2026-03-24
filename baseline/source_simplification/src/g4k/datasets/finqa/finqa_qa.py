@@ -2,7 +2,7 @@
 
 import json
 import uuid
-from typing import Optional
+from typing import Optional, Any
 
 import pandas as pd
 from g4k.internal.abstractions import BatchInferenceRunner, ResponseWrapper, Document, MetaData, RAGMethodInterface, PromptCollection, ResponseData
@@ -23,16 +23,16 @@ class FinQADatasetSample(BaseModel):
     post_text: Optional[str] = None
     table: Optional[str] = None
     context: Optional[str] = None
-    report_year: Optional[int] = None
-    page_number: Optional[int] = None
+    report_year: Optional[Any] = None
+    page_number: Optional[Any] = None
     company_symbol: Optional[str] = None
     company_name: Optional[str] = None
     company_sector: Optional[str] = None
     company_industry: Optional[str] = None
     company_headquarters: Optional[str] = None
-    company_date_added: Optional[str] = None
-    company_cik: Optional[int] = None
-    company_founded: Optional[str] = None
+    company_date_added: Optional[Any] = None
+    company_cik: Optional[Any] = None
+    company_founded: Optional[Any] = None
     question_de: Optional[str] = None
     context_de: Optional[str] = None
     program_answer: Optional[str] = None
