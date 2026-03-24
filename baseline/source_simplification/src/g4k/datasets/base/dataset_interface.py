@@ -17,7 +17,11 @@ class DatasetCollectionInterface(ABC):
 
     @abstractmethod
     def __init__(
-        self, df: pd.DataFrame, retrieval_query: str = "", meta_data_keys: list[str] = []
+        self,
+        df: pd.DataFrame,
+        retrieval_query: str = "",
+        meta_data_keys: list[str] = [],
+        document_percentage: float = 1.0,
     ) -> None:
         pass
 

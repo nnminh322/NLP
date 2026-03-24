@@ -50,6 +50,7 @@ class VAQDatasetCollection(DatasetCollectionInterface):
         df: pd.DataFrame,
         retrieval_query: str = "",
         meta_data_keys: List[str] = [],
+        document_percentage: float = 1.0,
     ) -> None:
         """Initialize the dataset collection.
 
@@ -61,6 +62,7 @@ class VAQDatasetCollection(DatasetCollectionInterface):
         """
         self.meta_data_keys = meta_data_keys
         self.retrieval_query = retrieval_query
+        self.document_percentage = document_percentage
 
         # Create samples from DataFrame records
         self.df = df

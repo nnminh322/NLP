@@ -1,8 +1,8 @@
 """Internal RAG method implementations."""
 
-from typing import List, Optional
+from typing import Any, List, Optional
 import numpy as np
-from g4k.internal.abstractions import Document, RAGMethodInterface, G4KRunner
+from g4k.internal.abstractions import Document, RAGMethodInterface, G4KRunner, ResponseWrapper, ResponseData, MetaData, PromptCollection
 
 class BaseRAG(RAGMethodInterface):
     """Standard vector-based retrieval."""
@@ -27,6 +27,50 @@ class BaseRAG(RAGMethodInterface):
     def retrieve(self, query: str) -> List[Document]:
         docs = self.vector_store.similarity_search(query, k=self.top_k)
         return [Document(page_content=d.page_content, metadata=d.metadata) for d in docs]
+
+    def run(
+        self,
+        runner: G4KRunner,
+        sys_prompt: str,
+        user_prompts: List[str] = [],
+        prompt_meta_data: List[MetaData] = [],
+        retrieval_queries: List[str] = [],
+        response_format: Any = None,
+    ) -> ResponseWrapper:
+        # 1. Retrieval
+        all_retrieved_docs = []
+        for query in retrieval_queries:
+            all_retrieved_docs.append(self.retrieve(query))
+        
+        # 2. Return if retrieval only
+        if getattr(self, "retrieval_only", False):
+            responses = []
+            for query, docs, meta in zip(retrieval_queries, all_retrieved_docs, prompt_meta_data):
+                responses.append(ResponseData(
+                    query=query,
+                    retrieved_docs=docs,
+                    generated_response=None,
+                    metadata=meta.data
+                ))
+            return ResponseWrapper(responses)
+        
+        # 3. Generation (if not retrieval only)
+        # Combine sys_prompt with user_prompts and contexts
+        prompt_collection = PromptCollection.create_prompts(
+            sys_prompt,
+            user_prompts,
+            # For each user prompt, we use the corresponding retrieved docs as context
+            # We'll join them into one Document for the PromptCollection
+            [Document(page_content="\n\n".join([d.page_content for d in docs]), metadata={}) for docs in all_retrieved_docs],
+            prompt_meta_data
+        )
+        responses = runner.run(prompt_collection)
+        
+        # Attach retrieved docs to the responses
+        for resp, docs in zip(responses.response_data, all_retrieved_docs):
+            resp.retrieved_docs = docs
+            
+        return responses
 
 class HybridBM25(RAGMethodInterface):
     """Hybrid retrieval (BM25 + Vector) with RRF fusion."""

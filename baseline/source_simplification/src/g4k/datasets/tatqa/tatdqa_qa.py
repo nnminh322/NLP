@@ -39,10 +39,12 @@ class TatQADatasetCollection(DatasetCollectionInterface):
         df: pd.DataFrame,
         retrieval_query: Optional[str] = "",
         meta_data_keys: list[str] = [],
+        document_percentage: float = 1.0,
     ) -> None:
         """Initialize the dataset collection."""
         self.meta_data_keys = meta_data_keys
         self.retrieval_query = retrieval_query
+        self.document_percentage = document_percentage
 
         # Create samples from DataFrame records
         self.samples = [TatQADatasetSample(**record) for record in df.to_dict(orient="records")]

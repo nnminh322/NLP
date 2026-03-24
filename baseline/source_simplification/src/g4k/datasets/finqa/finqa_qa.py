@@ -5,7 +5,7 @@ import uuid
 from typing import Optional
 
 import pandas as pd
-from g4k.internal.abstractions import BatchInferenceRunner, ResponseWrapper, Document, MetaData, RAGMethodInterface
+from g4k.internal.abstractions import BatchInferenceRunner, ResponseWrapper, Document, MetaData, RAGMethodInterface, PromptCollection, ResponseData
 from pydantic import BaseModel
 
 from g4k.datasets.base.dataset_interface import DatasetCollectionInterface
@@ -47,10 +47,12 @@ class FinQADatasetCollection(DatasetCollectionInterface):
         df: pd.DataFrame,
         retrieval_query: str = "",
         meta_data_keys: list[str] = [],
+        document_percentage: float = 1.0,
     ) -> None:
         """Initialize the dataset collection."""
         self.meta_data_keys = meta_data_keys
         self.retrieval_query = retrieval_query
+        self.document_percentage = document_percentage
 
         # Create samples from DataFrame records
         self.samples = [

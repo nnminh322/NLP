@@ -19,9 +19,16 @@ class SamplingParams:
 @dataclass
 class Document:
     """Internal Document class."""
-    page_content: str
+    page_content: str = ""
     metadata: Dict[str, Any] = field(default_factory=dict)
-    id: Optional[str] = None
+    id: Any = None
+    content: str = ""
+
+    def __post_init__(self):
+        if self.content and not self.page_content:
+            self.page_content = self.content
+        if self.page_content and not self.content:
+            self.content = self.page_content
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -80,6 +87,52 @@ class ResponseWrapper:
     """Wrapper for multiple responses."""
     response_data: List[ResponseData]
 
+    def __iter__(self):
+        return iter(self.response_data)
+
+    def __len__(self):
+        return len(self.response_data)
+
+@dataclass
+class Prompt:
+    """Internal Prompt class."""
+    system_prompt: str
+    user_prompt: str
+    metadata: MetaData = field(default_factory=MetaData)
+
+class PromptCollection:
+    """Collection of prompts for batch processing."""
+    def __init__(self, prompts: List[Prompt]):
+        self.prompts = prompts
+
+    def __iter__(self):
+        return iter(self.prompts)
+
+    def __len__(self):
+        return len(self.prompts)
+
+    @staticmethod
+    def create_prompts(
+        sys_prompt: str,
+        user_prompts: List[str],
+        contexts: List[Document],
+        meta_data: List[MetaData],
+        template_name: str = ""
+    ) -> "PromptCollection":
+        prompts = []
+        for u_prompt, context, meta in zip(user_prompts, contexts, meta_data):
+            # Simple template merging (placeholder for more complex logic if needed)
+            full_user_prompt = f"Context: {context.page_content}\n\nQuestion: {u_prompt}"
+            if template_name:
+                full_user_prompt = f"Template: {template_name}\n{full_user_prompt}"
+            
+            prompts.append(Prompt(
+                system_prompt=sys_prompt,
+                user_prompt=full_user_prompt,
+                metadata=meta
+            ))
+        return PromptCollection(prompts)
+
 class G4KRunner:
     """Basic LLM runner using OpenAI/vLLM API."""
     def __init__(self, sampling_params: Any, model: str, base_url: str):
@@ -106,6 +159,19 @@ class G4KRunner:
         """Simple batch generation (could be optimized)."""
         return [self.generate(p) for p in prompts]
 
+    def run(self, prompt_collection: PromptCollection) -> ResponseWrapper:
+        """Run a collection of prompts and return responses."""
+        responses = []
+        for prompt in prompt_collection:
+            content = self.generate(f"{prompt.system_prompt}\n\n{prompt.user_prompt}")
+            responses.append(ResponseData(
+                query=prompt.user_prompt,
+                retrieved_docs=[], # Internal runner calls may not have docs
+                generated_response=content,
+                metadata=prompt.metadata.data
+            ))
+        return ResponseWrapper(responses)
+
 # Alias for backward compatibility during refactor
 BatchInferenceRunner = G4KRunner
 
@@ -114,4 +180,17 @@ class RAGMethodInterface(ABC):
     @abstractmethod
     def retrieve(self, query: str) -> List[Document]:
         """Retrieve documents for a query."""
+        pass
+
+    @abstractmethod
+    def run(
+        self,
+        runner: G4KRunner,
+        sys_prompt: str,
+        user_prompts: List[str] = [],
+        prompt_meta_data: List[MetaData] = [],
+        retrieval_queries: List[str] = [],
+        response_format: Any = None,
+    ) -> ResponseWrapper:
+        """Run retrieval and optionally generation for a batch of queries."""
         pass
