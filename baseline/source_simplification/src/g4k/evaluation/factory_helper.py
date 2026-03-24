@@ -39,7 +39,7 @@ def get_dataset_class(dataset_name: str) -> type[DatasetCollectionInterface]:
 class MRRMetric:
     def __init__(self, k: int = 3):
         self.k = k
-        self.name = f"MRR@{k}"
+        self.name = f"MRR_at_{k}"
     def __call__(self, responses: list[ResponseData]) -> Any:
         mrr = 0.0
         for resp in responses:
@@ -56,7 +56,7 @@ class MRRMetric:
 class RecallAtKMetric:
     def __init__(self, k: int = 3):
         self.k = k
-        self.name = f"R@{k}"
+        self.name = f"Recall_at_{k}"
     def __call__(self, responses: list[ResponseData]) -> Any:
         hits = 0
         for resp in responses:
@@ -72,7 +72,7 @@ class RecallAtKMetric:
 class NDCGMetric:
     def __init__(self, k: int = 3):
         self.k = k
-        self.name = f"NDCG@{k}"
+        self.name = f"NDCG_at_{k}"
     def __call__(self, responses: list[ResponseData]) -> Any:
         total_ndcg = 0.0
         import math
