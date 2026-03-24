@@ -15,6 +15,7 @@ import pandas as pd
 from datasets import load_dataset
 from dotenv import load_dotenv
 from langchain_huggingface import HuggingFaceEmbeddings
+from tqdm import tqdm
 from g4k.internal.abstractions import BatchInferenceRunner, SamplingParams
 
 from g4k.evaluation.config import Config
@@ -77,12 +78,29 @@ def run_benchmark(cfg: Config, mode: str, dataset: str) -> None:
     qa_dataset = load_dataset(
         cfg.dataset.name, cfg.dataset.config_name, split=cfg.dataset.split
     ).to_pandas()
+    
+    # Load full dataset for corpus construction (union of all splits)
+    logger.info("Loading full dataset for corpus construction...")
+    full_dataset = load_dataset(
+        cfg.dataset.name, cfg.dataset.config_name
+    )
+    import pandas as pd
+    corpus_dfs = []
+    from datasets import DatasetDict
+    if isinstance(full_dataset, DatasetDict):
+        for split_name in tqdm(full_dataset.keys(), desc="Loading splits for corpus"):
+            corpus_dfs.append(full_dataset[split_name].to_pandas())
+    else:
+        corpus_dfs.append(full_dataset.to_pandas())
+    corpus_df = pd.concat(corpus_dfs, ignore_index=True)
+    
     dataset_cls = get_dataset_class(cfg.dataset.runner_name)
     dataset_obj = dataset_cls(
         qa_dataset,
         cfg.dataset.retrieval_query,
         cfg.dataset.meta_data_keys,
         cfg.dataset.document_percentage,
+        corpus_df=corpus_df
     )
     
     # Initialize RAG method
@@ -108,8 +126,7 @@ def run_benchmark(cfg: Config, mode: str, dataset: str) -> None:
     )
     
     # Save results for evaluation
-    timestamp = datetime.now().strftime("%Y-%m-%d/%H-%M-%S")
-    output_dir = Path(f"outputs/benchmark_retrieval/{cfg.dataset.name}/{mode}/{timestamp}")
+    output_dir = Path(f"outputs/benchmark_retrieval/{cfg.dataset.name}/{mode}")
     output_dir.mkdir(parents=True, exist_ok=True)
     
     from g4k.file_manager import FileManager

@@ -51,6 +51,9 @@ def evaluation(cfg: Config, results_path: Optional[Path] = None) -> None:
         if not results_path.exists() or not results_path.is_dir():
             raise ValueError(f"Results folder not found: {results_path}")
 
+        # Save configuration parameters to the results folder
+        FileManager(str(results_path / "config.json")).dump_json(flat_config)
+
         # Convert to ResponseData list
         responses_json = FileManager(list(results_path.glob("inference_log.json"))[0]).load_json()
         responses = [ResponseData.from_dict(item) for item in responses_json]
@@ -74,6 +77,14 @@ def evaluation(cfg: Config, results_path: Optional[Path] = None) -> None:
     FileManager(
         str(results_path / "metrics_log.json")
     ).dump_json(metrics_log, pydantic_encoder=True)
+
+    print("\n" + "="*50)
+    print("FINAL RETRIEVAL BENCHMARK RESULTS")
+    print("="*50)
+    for m_log in metrics_log:
+        for name, data in m_log.items():
+            print(f"{name}: {data['score']:.4f}")
+    print("="*50 + "\n")
 
 
 if __name__ == "__main__":

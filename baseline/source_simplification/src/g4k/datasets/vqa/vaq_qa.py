@@ -51,6 +51,7 @@ class VAQDatasetCollection(DatasetCollectionInterface):
         retrieval_query: str = "",
         meta_data_keys: List[str] = [],
         document_percentage: float = 1.0,
+        corpus_df: Optional[pd.DataFrame] = None,
     ) -> None:
         """Initialize the dataset collection.
 
@@ -76,10 +77,20 @@ class VAQDatasetCollection(DatasetCollectionInterface):
         # Create context IDs for each sample
         self.create_context_ids()
 
+        # Build corpus
+        if corpus_df is not None:
+            self.corpus_samples = [
+                VAQDatasetSample(**{str(k): v for k, v in record.items()})
+                for record in corpus_df.to_dict(orient="records")
+            ]
+            self.create_corpus_context_ids()
+            self.context_collection = self.prepare_contexts_for_db(use_corpus=True)
+        else:
+            self.context_collection = self.prepare_contexts_for_db(use_corpus=False)
+
         # Create metadata and prepare user prompts using samples
         self.prompt_meta_data = self.create_prompt_meta_data()
         self.user_prompts = [sample.question for sample in self.samples]
-        self.context_collection = self.prepare_contexts_for_db()
 
     def get_context_collection(self) -> List[Document]:
         """Get the context collection."""
@@ -89,14 +100,24 @@ class VAQDatasetCollection(DatasetCollectionInterface):
         """Get the DataFrame."""
         return self.df.drop(columns=["tables", "annotations", "html_source"])
 
+    def _get_deterministic_id(self, content: str) -> str:
+        """Generate a deterministic UUID based on content string."""
+        import hashlib
+        m = hashlib.md5()
+        m.update(content.encode("utf-8"))
+        return str(uuid.UUID(m.hexdigest()))
+
     def create_context_ids(self) -> None:
-        """Create context ID for each sample and update both samples and qa_dataset."""
-        # Create mapping of unique contexts to UUIDs
-        context_dict = {}
+        """Create context ID for each sample using deterministic hashing."""
         for sample in self.samples:
-            if sample.context not in context_dict:
-                context_dict[sample.context] = str(uuid.uuid4())
-            sample.context_id = context_dict[sample.context]
+            if sample.context:
+                sample.context_id = self._get_deterministic_id(sample.context)
+
+    def create_corpus_context_ids(self) -> None:
+        """Create context ID for each corpus sample using deterministic hashing."""
+        for sample in self.corpus_samples:
+            if sample.context:
+                sample.context_id = self._get_deterministic_id(sample.context)
 
     def create_prompt_meta_data(self) -> List[MetaData]:
         """Create metadata from samples."""
@@ -106,7 +127,7 @@ class VAQDatasetCollection(DatasetCollectionInterface):
                 "reference_answer": sample.answer,
                 "id": sample.id,
                 "reference_document": Document(
-                    id=sample.context_id or uuid.uuid4(),
+                    id=uuid.UUID(sample.context_id) if sample.context_id else uuid.UUID(self._get_deterministic_id(sample.context or "")),
                     content=sample.context or "",
                     meta_data=MetaData(
                         {
@@ -128,20 +149,35 @@ class VAQDatasetCollection(DatasetCollectionInterface):
             meta_datas.append(meta_data)
         return meta_datas
 
-    def prepare_contexts_for_db(self) -> List[Document]:
-        """Prepare contexts from samples for the vector database."""
-        context_collection = []
-        for sample in self.samples:
-            if sample.context:
-                context = Document(
-                    id=sample.context_id,
-                    content=sample.context or "",
+    def prepare_contexts_for_db(self, use_corpus: bool = False) -> List[Document]:
+        """Prepare contexts for the vector database."""
+        source_samples = self.corpus_samples if use_corpus else self.samples
+        
+        # Deduplicate contexts by ID
+        unique_contexts = {}
+        for sample in source_samples:
+            if not sample.context:
+                continue
+            ctx_id = sample.context_id or self._get_deterministic_id(sample.context)
+            if ctx_id not in unique_contexts:
+                unique_contexts[ctx_id] = Document(
+                    id=uuid.UUID(ctx_id) if isinstance(ctx_id, str) else ctx_id,
+                    content=sample.context,
                     meta_data=MetaData(
                         {key: getattr(sample, key, None) for key in self.meta_data_keys}
                     ),
                 )
-                context_collection.append(context)
-        return context_collection
+        
+        collection = list(unique_contexts.values())
+        
+        # Sampling if needed
+        if self.document_percentage < 1.0:
+            import random
+            random.seed(42)
+            n = int(len(collection) * self.document_percentage)
+            collection = random.sample(collection, n)
+            
+        return collection
 
     def run(
         self,
