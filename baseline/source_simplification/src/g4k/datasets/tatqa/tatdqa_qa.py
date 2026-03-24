@@ -2,7 +2,7 @@
 
 import json
 import uuid
-from typing import Optional
+from typing import Optional, Any
 
 import pandas as pd
 from g4k.internal.abstractions import BatchInferenceRunner, ResponseWrapper, Document, MetaData, RAGMethodInterface
