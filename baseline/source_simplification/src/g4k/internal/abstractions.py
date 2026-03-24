@@ -17,6 +17,11 @@ class SamplingParams:
     stop: List[str] = field(default_factory=list)
 
 @dataclass
+class MetaData:
+    """Internal MetaData class for prompt engineering."""
+    data: Dict[str, Any] = field(default_factory=dict)
+
+@dataclass
 class Document:
     """Internal Document class."""
     page_content: str = ""
@@ -44,11 +49,6 @@ class Document:
             meta_data=data.get("meta_data", {}),
             id=data.get("id")
         )
-
-@dataclass
-class MetaData:
-    """Internal MetaData class for prompt engineering."""
-    data: Dict[str, Any] = field(default_factory=dict)
 
 @dataclass
 class Response:
