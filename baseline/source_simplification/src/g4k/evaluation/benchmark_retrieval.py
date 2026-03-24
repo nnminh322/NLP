@@ -114,7 +114,7 @@ def run_benchmark(cfg: Config, mode: str, dataset: str) -> None:
     
     from g4k.file_manager import FileManager
     json_dump = [response.to_dict() for response in responses.response_data]
-    FileManager(str(output_dir / "inference_log.json")).dump_json(json_dump)
+    FileManager(str(output_dir / "inference_log.json")).dump_json(json_dump, pydantic_encoder=True)
     
     # Run evaluation to get metrics
     cfg.rag.method = method_cfg.method
