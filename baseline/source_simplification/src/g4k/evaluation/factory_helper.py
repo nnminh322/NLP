@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, Optional, Tuple
 
-from g4k.internal.abstractions import G4KRunner as BatchInferenceRunner
+from g4k.internal.abstractions import BatchInferenceRunner, ResponseData
 from g4k.internal.rag_methods import RAG_REGISTRY
 from omegaconf import DictConfig, OmegaConf
 from pydantic import BaseModel, create_model
