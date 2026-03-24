@@ -51,7 +51,7 @@ class MRRMetric:
                     mrr += 1.0 / rank
                     break
         score = mrr / len(responses) if responses else 0.0
-        return type("MetricOutput", (), {"score": score, "to_dict": lambda s: {f"mrr_at_{self.k}": score}})()
+        return type("MetricOutput", (), {"score": score, "to_dict": lambda s: {"score": score, f"mrr_at_{self.k}": score}})()
 
 class RecallAtKMetric:
     def __init__(self, k: int = 3):
@@ -67,7 +67,7 @@ class RecallAtKMetric:
             if gt_id in retrieved_ids:
                 hits += 1
         score = hits / len(responses) if responses else 0.0
-        return type("MetricOutput", (), {"score": score, "to_dict": lambda s: {f"recall_at_{self.k}": score}})()
+        return type("MetricOutput", (), {"score": score, "to_dict": lambda s: {"score": score, f"recall_at_{self.k}": score}})()
 
 class NDCGMetric:
     def __init__(self, k: int = 3):
@@ -88,7 +88,7 @@ class NDCGMetric:
                     break
             total_ndcg += ndcg
         score = total_ndcg / len(responses) if responses else 0.0
-        return type("MetricOutput", (), {"score": score, "to_dict": lambda s: {f"ndcg_at_{self.k}": score}})()
+        return type("MetricOutput", (), {"score": score, "to_dict": lambda s: {"score": score, f"ndcg_at_{self.k}": score}})()
 
 def load_metrics(
     config: list[str | dict[str, dict[str, str]]], runner: BatchInferenceRunner = None
