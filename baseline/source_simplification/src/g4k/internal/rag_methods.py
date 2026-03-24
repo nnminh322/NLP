@@ -21,7 +21,7 @@ class BaseRAG(RAGMethodInterface):
         from langchain_community.vectorstores import FAISS
         from langchain_core.documents import Document as LCDocument
         
-        lc_docs = [LCDocument(page_content=doc.page_content, metadata=doc.meta_data) for doc in context_collection]
+        lc_docs = [LCDocument(page_content=doc.page_content, metadata=(doc.meta_data.data if hasattr(doc.meta_data, "data") else doc.meta_data)) for doc in context_collection]
         self.vector_store = FAISS.from_documents(lc_docs, embedding_function)
 
     def retrieve(self, query: str) -> List[Document]:
@@ -88,7 +88,7 @@ class HybridBM25(RAGMethodInterface):
         # Vector Store
         from langchain_community.vectorstores import FAISS
         from langchain_core.documents import Document as LCDocument
-        lc_docs = [LCDocument(page_content=doc.page_content, metadata=doc.meta_data) for doc in context_collection]
+        lc_docs = [LCDocument(page_content=doc.page_content, metadata=(doc.meta_data.data if hasattr(doc.meta_data, "data") else doc.meta_data)) for doc in context_collection]
         self.vector_store = FAISS.from_documents(lc_docs, embedding_function)
         
         # BM25
