@@ -12,6 +12,7 @@ from omegaconf import DictConfig, OmegaConf
 import pandas as pd
 from datasets import load_dataset
 from dotenv import load_dotenv
+from langchain_huggingface import HuggingFaceEmbeddings
 from g4k.internal.abstractions import BatchInferenceRunner, SamplingParams
 
 from g4k.evaluation.config import Config
@@ -60,6 +61,10 @@ def run_benchmark(cfg: Config, mode: str, dataset: str) -> None:
     
     runner = BatchInferenceRunner(sampling_params, runner_model, base_url=runner_url)
     
+    # Setup embeddings
+    logger.info(f"Loading embedding model: {cfg.vector_db.embedding_function}")
+    embeddings = HuggingFaceEmbeddings(model_name=cfg.vector_db.embedding_function)
+    
     # Load dataset
     qa_dataset = load_dataset(
         cfg.dataset.name, cfg.dataset.config_name, split=cfg.dataset.split
@@ -77,7 +82,7 @@ def run_benchmark(cfg: Config, mode: str, dataset: str) -> None:
     rag_method_instance = rag_method_cls(
         context_collection=dataset_obj.get_context_collection(),
         collection_name=cfg.vector_db.collection_name,
-        embedding_function=cfg.vector_db.embedding_function,
+        embedding_function=embeddings,
         top_k=cfg.vector_db.top_k,
         retrieval_only=True,
         runner=runner,
