@@ -1,5 +1,6 @@
 name: "G4KMU/t2-ragbench"
 config_name: "TAT-DQA"
+runner_name: "G4KMU/flare-tatqa-german"
 split: "test"
 language: "en"
 meta_data_keys:

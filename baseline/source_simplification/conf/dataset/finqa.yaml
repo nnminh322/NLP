@@ -1,5 +1,6 @@
 name: "G4KMU/t2-ragbench"
 config_name: "FinQA"
+runner_name: "G4KMU/finqa-german"
 split: "test"
 language: "en"
 meta_data_keys:
