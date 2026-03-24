@@ -20,7 +20,7 @@ class SamplingParams:
 class Document:
     """Internal Document class."""
     page_content: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    meta_data: Union[MetaData, Dict[str, Any]] = field(default_factory=dict)
     id: Any = None
     content: str = ""
 
@@ -33,17 +33,18 @@ class Document:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "page_content": self.page_content,
-            "metadata": self.metadata,
+            "meta_data": self.meta_data if isinstance(self.meta_data, dict) else self.meta_data.data,
             "id": self.id
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Document":
         return cls(
-            page_content=data["page_content"],
-            metadata=data.get("metadata", {}),
+            page_content=data.get("page_content", ""),
+            meta_data=data.get("meta_data", {}),
             id=data.get("id")
         )
+inline: 
 
 @dataclass
 class MetaData:
@@ -55,7 +56,7 @@ class Response:
     """Internal Response class for LLM outputs."""
     content: str
     raw: Any = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    meta_data: Dict[str, Any] = field(default_factory=dict)
 
 @dataclass
 class ResponseData:
@@ -63,14 +64,14 @@ class ResponseData:
     query: str
     retrieved_docs: List[Document]
     generated_response: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    meta_data: Dict[str, Any] = field(default_factory=dict)
     
     def to_dict(self) -> Dict[str, Any]:
         return {
             "query": self.query,
             "retrieved_docs": [doc.to_dict() for doc in self.retrieved_docs],
             "generated_response": self.generated_response,
-            "metadata": self.metadata
+            "meta_data": self.meta_data
         }
 
     @classmethod
@@ -79,7 +80,7 @@ class ResponseData:
             query=data["query"],
             retrieved_docs=[Document.from_dict(doc) for doc in data.get("retrieved_docs", [])],
             generated_response=data.get("generated_response"),
-            metadata=data.get("metadata", {})
+            meta_data=data.get("meta_data", {})
         )
 
 @dataclass
@@ -98,7 +99,7 @@ class Prompt:
     """Internal Prompt class."""
     system_prompt: str
     user_prompt: str
-    metadata: MetaData = field(default_factory=MetaData)
+    meta_data: MetaData = field(default_factory=MetaData)
 
 class PromptCollection:
     """Collection of prompts for batch processing."""
@@ -129,7 +130,7 @@ class PromptCollection:
             prompts.append(Prompt(
                 system_prompt=sys_prompt,
                 user_prompt=full_user_prompt,
-                metadata=meta
+                meta_data=meta
             ))
         return PromptCollection(prompts)
 
@@ -168,7 +169,7 @@ class G4KRunner:
                 query=prompt.user_prompt,
                 retrieved_docs=[], # Internal runner calls may not have docs
                 generated_response=content,
-                metadata=prompt.metadata.data
+                meta_data=prompt.meta_data.data
             ))
         return ResponseWrapper(responses)
 

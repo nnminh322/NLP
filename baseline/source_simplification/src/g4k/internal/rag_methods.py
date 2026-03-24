@@ -21,12 +21,12 @@ class BaseRAG(RAGMethodInterface):
         from langchain_community.vectorstores import FAISS
         from langchain_core.documents import Document as LCDocument
         
-        lc_docs = [LCDocument(page_content=doc.page_content, metadata=doc.metadata) for doc in context_collection]
+        lc_docs = [LCDocument(page_content=doc.page_content, metadata=doc.meta_data) for doc in context_collection]
         self.vector_store = FAISS.from_documents(lc_docs, embedding_function)
 
     def retrieve(self, query: str) -> List[Document]:
         docs = self.vector_store.similarity_search(query, k=self.top_k)
-        return [Document(page_content=d.page_content, metadata=d.metadata) for d in docs]
+        return [Document(page_content=d.page_content, meta_data=d.metadata) for d in docs]
 
     def run(
         self,
@@ -50,7 +50,7 @@ class BaseRAG(RAGMethodInterface):
                     query=query,
                     retrieved_docs=docs,
                     generated_response=None,
-                    metadata=meta.data
+                    meta_data=meta.data
                 ))
             return ResponseWrapper(responses)
         
@@ -61,7 +61,7 @@ class BaseRAG(RAGMethodInterface):
             user_prompts,
             # For each user prompt, we use the corresponding retrieved docs as context
             # We'll join them into one Document for the PromptCollection
-            [Document(page_content="\n\n".join([d.page_content for d in docs]), metadata={}) for docs in all_retrieved_docs],
+            [Document(page_content="\n\n".join([d.page_content for d in docs]), meta_data={}) for docs in all_retrieved_docs],
             prompt_meta_data
         )
         responses = runner.run(prompt_collection)
@@ -88,7 +88,7 @@ class HybridBM25(RAGMethodInterface):
         # Vector Store
         from langchain_community.vectorstores import FAISS
         from langchain_core.documents import Document as LCDocument
-        lc_docs = [LCDocument(page_content=doc.page_content, metadata=doc.metadata) for doc in context_collection]
+        lc_docs = [LCDocument(page_content=doc.page_content, metadata=doc.meta_data) for doc in context_collection]
         self.vector_store = FAISS.from_documents(lc_docs, embedding_function)
         
         # BM25
@@ -114,7 +114,7 @@ class HybridBM25(RAGMethodInterface):
         # Interleave (simplified RRF behavior)
         for v_doc, b_doc in zip(vector_docs, bm25_docs):
             if v_doc.page_content not in seen:
-                combined.append(Document(page_content=v_doc.page_content, metadata=v_doc.metadata))
+                combined.append(Document(page_content=v_doc.page_content, meta_data=v_doc.metadata))
                 seen.add(v_doc.page_content)
             if b_doc.page_content not in seen:
                 combined.append(b_doc)
