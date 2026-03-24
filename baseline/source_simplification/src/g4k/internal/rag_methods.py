@@ -29,7 +29,16 @@ class BaseRAG(RAGMethodInterface):
             md = md.copy() if isinstance(md, dict) else {}
             md["id"] = str(doc.id) if doc.id else None
             lc_docs.append(LCDocument(page_content=doc.page_content, metadata=md))
-        self.vector_store = FAISS.from_documents(lc_docs, embedding_function)
+        
+        # Build vector store in batches to show progress
+        batch_size = 100
+        self.vector_store = None
+        for i in tqdm(range(0, len(lc_docs), batch_size), desc=f"Indexing documents for {self.__class__.__name__}"):
+            batch = lc_docs[i:i+batch_size]
+            if self.vector_store is None:
+                self.vector_store = FAISS.from_documents(batch, embedding_function)
+            else:
+                self.vector_store.add_documents(batch)
 
     def retrieve(self, query: str) -> List[Document]:
         docs = self.vector_store.similarity_search(query, k=self.top_k)
@@ -101,7 +110,16 @@ class HybridBM25(RAGMethodInterface):
             md = md.copy() if isinstance(md, dict) else {}
             md["id"] = str(doc.id)
             lc_docs.append(LCDocument(page_content=doc.page_content, metadata=md))
-        self.vector_store = FAISS.from_documents(lc_docs, embedding_function)
+            
+        # Build vector store in batches to show progress
+        batch_size = 100
+        self.vector_store = None
+        for i in tqdm(range(0, len(lc_docs), batch_size), desc=f"Indexing documents for {self.__class__.__name__}"):
+            batch = lc_docs[i:i+batch_size]
+            if self.vector_store is None:
+                self.vector_store = FAISS.from_documents(batch, embedding_function)
+            else:
+                self.vector_store.add_documents(batch)
         
         # BM25
         from rank_bm25 import BM25Okapi

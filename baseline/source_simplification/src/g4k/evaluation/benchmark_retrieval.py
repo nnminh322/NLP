@@ -62,8 +62,14 @@ def run_benchmark(cfg: Config, mode: str, dataset: str) -> None:
     runner = BatchInferenceRunner(sampling_params, runner_model, base_url=runner_url)
     
     # Setup embeddings
-    logger.info(f"Loading embedding model: {cfg.vector_db.embedding_function}")
-    embeddings = HuggingFaceEmbeddings(model_name=cfg.vector_db.embedding_function)
+    import torch
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    logger.info(f"Loading embedding model: {cfg.vector_db.embedding_function} on {device}")
+    
+    embeddings = HuggingFaceEmbeddings(
+        model_name=cfg.vector_db.embedding_function,
+        model_kwargs={'device': device}
+    )
     
     # Load dataset
     qa_dataset = load_dataset(
