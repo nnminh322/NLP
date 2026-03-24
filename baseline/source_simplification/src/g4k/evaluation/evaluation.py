@@ -2,7 +2,7 @@
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 import hydra
 import mlflow
 from g4k.internal.abstractions import BatchInferenceRunner, SamplingParams, Response, ResponseData
@@ -39,13 +39,15 @@ def main(cfg: Config) -> None:
             evaluation(cfg)
 
 
-def evaluation(cfg: Config) -> None:
+def evaluation(cfg: Config, results_path: Optional[Path] = None) -> None:
     """Evaluate the QA results with MLflow tracking."""
     flat_config = flatten_dict(cfg)
     mlflow.log_params(flat_config)
 
     with mlflow.start_span(name="loading_results"):
-        results_path = Path(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
+        if results_path is None:
+            results_path = Path(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
+            
         if not results_path.exists() or not results_path.is_dir():
             raise ValueError(f"Results folder not found: {results_path}")
 
@@ -70,7 +72,7 @@ def evaluation(cfg: Config) -> None:
         mlflow.log_metric(metric.name, result.score)
 
     FileManager(
-        hydra.core.hydra_config.HydraConfig.get().runtime.output_dir + "/metrics_log.json"
+        str(results_path / "metrics_log.json")
     ).dump_json(metrics_log, pydantic_encoder=True)
 
 

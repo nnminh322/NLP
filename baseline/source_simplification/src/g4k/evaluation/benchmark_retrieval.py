@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Standalone script to benchmark retrieval phase of T2-RAGBench."""
 
+import os
 import argparse
 import logging
 import sys
 from pathlib import Path
+from datetime import datetime
 
 import hydra
 from hydra import compose, initialize
@@ -106,17 +108,18 @@ def run_benchmark(cfg: Config, mode: str, dataset: str) -> None:
     )
     
     # Save results for evaluation
-    output_dir = Path(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
+    timestamp = datetime.now().strftime("%Y-%m-%d/%H-%M-%S")
+    output_dir = Path(f"outputs/benchmark_retrieval/{cfg.dataset.name}/{mode}/{timestamp}")
     output_dir.mkdir(parents=True, exist_ok=True)
     
     from g4k.file_manager import FileManager
     json_dump = [response.to_dict() for response in responses.response_data]
     FileManager(str(output_dir / "inference_log.json")).dump_json(json_dump)
     
-    # Run evaluation to get metrics (MRR, Recall)
+    # Run evaluation to get metrics
     cfg.rag.method = method_cfg.method
     cfg.rag.retrieval_only = True
-    evaluation(cfg)
+    evaluation(cfg, results_path=output_dir)
     
     logger.info(f"Finished benchmark for {mode} on {dataset}")
 
