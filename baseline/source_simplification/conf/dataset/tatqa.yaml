@@ -1,6 +1,6 @@
 name: "G4KMU/t2-ragbench"
 config_name: "TAT-DQA"
-split: "all_generated"
+split: "test"
 language: "en"
 meta_data_keys:
   - question

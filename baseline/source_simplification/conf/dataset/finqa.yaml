@@ -1,6 +1,6 @@
 name: "G4KMU/t2-ragbench"
 config_name: "FinQA"
-split: "dev_generated+train_generated+test_generated"
+split: "test"
 language: "en"
 meta_data_keys:
   - report_year

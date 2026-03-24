@@ -2,7 +2,7 @@
 
 import logging
 from pathlib import Path
-
+from typing import Any
 import hydra
 import mlflow
 from g4k.internal.abstractions import BatchInferenceRunner, SamplingParams, Response, ResponseData

@@ -1,6 +1,6 @@
 name: "G4KMU/va_qa"
 runner_name: "G4KMU/va_qa"
-split: "val_generated"
+split: "test"
 language: "en"
 meta_data_keys:
   - report_year
