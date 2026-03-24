@@ -44,7 +44,6 @@ class Document:
             meta_data=data.get("meta_data", {}),
             id=data.get("id")
         )
-inline: 
 
 @dataclass
 class MetaData:
