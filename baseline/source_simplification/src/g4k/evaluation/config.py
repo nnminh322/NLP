@@ -25,12 +25,12 @@ class Dataset:
     """Dataset configuration."""
 
     name: str
-    config_name: str | None = None
     split: str
     language: str
     context_key: str
     answer_key: str
     sys_prompt_path: str
+    config_name: str | None = None
     tool_name: str = ""
     runner_name: str = ""
     meta_data_keys: list[str] = field(default_factory=list)

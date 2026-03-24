@@ -5,12 +5,20 @@ from pathlib import Path
 
 import hydra
 import mlflow
-from g4k.internal.abstractions import BatchInferenceRunner, SamplingParams
-
+from g4k.internal.abstractions import BatchInferenceRunner, SamplingParams, Response, ResponseData
 from g4k.evaluation.config import Config
 from g4k.evaluation.factory_helper import load_metrics
 from g4k.file_manager import FileManager
 from g4k.utils import flatten_dict
+
+# Dummy classes for type hinting if not defined elsewhere
+class Metric:
+    name: str
+    def __call__(self, responses: Any) -> Any: pass
+
+class MetricOutput:
+    score: float
+    def to_dict(self) -> dict: return {}
 
 logger = logging.getLogger(__name__)
 config_path = str((Path(__file__).parents[3] / "conf").resolve())
@@ -41,9 +49,9 @@ def evaluation(cfg: Config) -> None:
         if not results_path.exists() or not results_path.is_dir():
             raise ValueError(f"Results folder not found: {results_path}")
 
-        # Convert to ResponseDataCollection format
+        # Convert to ResponseData list
         responses_json = FileManager(list(results_path.glob("inference_log.json"))[0]).load_json()
-        responses = [Response.from_dict(item) for item in responses_json]
+        responses = [ResponseData.from_dict(item) for item in responses_json]
 
         logger.info(f"Loaded {len(responses)} responses!")
 

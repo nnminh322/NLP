@@ -30,6 +30,14 @@ class Document:
             "id": self.id
         }
 
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Document":
+        return cls(
+            page_content=data["page_content"],
+            metadata=data.get("metadata", {}),
+            id=data.get("id")
+        )
+
 @dataclass
 class MetaData:
     """Internal MetaData class for prompt engineering."""
@@ -57,6 +65,15 @@ class ResponseData:
             "generated_response": self.generated_response,
             "metadata": self.metadata
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ResponseData":
+        return cls(
+            query=data["query"],
+            retrieved_docs=[Document.from_dict(doc) for doc in data.get("retrieved_docs", [])],
+            generated_response=data.get("generated_response"),
+            metadata=data.get("metadata", {})
+        )
 
 @dataclass
 class ResponseWrapper:
