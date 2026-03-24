@@ -18,6 +18,8 @@ class BaseRAG(RAGMethodInterface):
         self.context_collection = context_collection
         self.embedding_function = embedding_function
         self.top_k = top_k
+        for key, value in kwargs.items():
+            setattr(self, key, value)
         
         # Initialize LangChain FAISS index
         from langchain_community.vectorstores import FAISS
@@ -100,6 +102,9 @@ class HybridBM25(RAGMethodInterface):
         self.context_collection = context_collection
         self.embedding_function = embedding_function
         self.top_k = top_k
+        self.retrieval_only = kwargs.get("retrieval_only", False)
+        for key, value in kwargs.items():
+            setattr(self, key, value)
         
         # Vector Store
         from langchain_community.vectorstores import FAISS
