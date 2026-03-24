@@ -1,6 +1,8 @@
 """A module to manage file operations."""
 
 import json
+import uuid
+from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any, Union
 
@@ -15,9 +17,13 @@ class PydanticEncoder(json.JSONEncoder):
     """
 
     def default(self, obj: Any) -> Any:
-        """Convert Pydantic models to dict before serializing to JSON."""
+        """Convert Pydantic models, dataclasses, and UUIDs to serializable formats."""
         if isinstance(obj, BaseModel):
             return obj.model_dump()
+        if is_dataclass(obj):
+            return asdict(obj)
+        if isinstance(obj, uuid.UUID):
+            return str(obj)
         return super().default(obj)
 
 

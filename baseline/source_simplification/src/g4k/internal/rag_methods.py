@@ -1,7 +1,9 @@
 """Internal RAG method implementations."""
 
 from typing import Any, List, Optional
+import uuid
 import numpy as np
+from tqdm import tqdm
 from g4k.internal.abstractions import Document, RAGMethodInterface, G4KRunner, ResponseWrapper, ResponseData, MetaData, PromptCollection
 
 class BaseRAG(RAGMethodInterface):
@@ -21,12 +23,17 @@ class BaseRAG(RAGMethodInterface):
         from langchain_community.vectorstores import FAISS
         from langchain_core.documents import Document as LCDocument
         
-        lc_docs = [LCDocument(page_content=doc.page_content, metadata=(doc.meta_data.data if hasattr(doc.meta_data, "data") else doc.meta_data)) for doc in context_collection]
+        lc_docs = []
+        for doc in context_collection:
+            md = (doc.meta_data.data if hasattr(doc.meta_data, "data") else doc.meta_data)
+            md = md.copy() if isinstance(md, dict) else {}
+            md["id"] = str(doc.id) if doc.id else None
+            lc_docs.append(LCDocument(page_content=doc.page_content, metadata=md))
         self.vector_store = FAISS.from_documents(lc_docs, embedding_function)
 
     def retrieve(self, query: str) -> List[Document]:
         docs = self.vector_store.similarity_search(query, k=self.top_k)
-        return [Document(page_content=d.page_content, meta_data=d.metadata) for d in docs]
+        return [Document(page_content=d.page_content, meta_data=d.metadata, id=d.metadata.get("id")) for d in docs]
 
     def run(
         self,
@@ -39,7 +46,7 @@ class BaseRAG(RAGMethodInterface):
     ) -> ResponseWrapper:
         # 1. Retrieval
         all_retrieved_docs = []
-        for query in retrieval_queries:
+        for query in tqdm(retrieval_queries, desc=f"Retrieving for {self.__class__.__name__}"):
             all_retrieved_docs.append(self.retrieve(query))
         
         # 2. Return if retrieval only
@@ -88,7 +95,12 @@ class HybridBM25(RAGMethodInterface):
         # Vector Store
         from langchain_community.vectorstores import FAISS
         from langchain_core.documents import Document as LCDocument
-        lc_docs = [LCDocument(page_content=doc.page_content, metadata=(doc.meta_data.data if hasattr(doc.meta_data, "data") else doc.meta_data)) for doc in context_collection]
+        lc_docs = []
+        for doc in context_collection:
+            md = (doc.meta_data.data if hasattr(doc.meta_data, "data") else doc.meta_data)
+            md = md.copy() if isinstance(md, dict) else {}
+            md["id"] = str(doc.id)
+            lc_docs.append(LCDocument(page_content=doc.page_content, metadata=md))
         self.vector_store = FAISS.from_documents(lc_docs, embedding_function)
         
         # BM25
