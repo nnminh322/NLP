@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import hydra
+from hydra import compose, initialize
 from omegaconf import DictConfig, OmegaConf
 import pandas as pd
 from datasets import load_dataset
@@ -108,8 +109,7 @@ def run_benchmark(cfg: Config, mode: str, dataset: str) -> None:
     
     logger.info(f"Finished benchmark for {mode} on {dataset}")
 
-@hydra.main(version_base=None, config_path=config_path, config_name="defaults")
-def main(cfg: Config) -> None:
+def main() -> None:
     """Main entry point with custom argument parsing."""
     load_dotenv(".env")
     
@@ -118,9 +118,11 @@ def main(cfg: Config) -> None:
     parser.add_argument("--mode", type=str, required=True, help="Retrieval mode (e.g. base, hybrid, hyde, summarization)")
     parser.add_argument("--dataset", type=str, required=True, help="Dataset (e.g. finqa, convfinqa, tatqa)")
     
-    # We need to filter out Hydra arguments from sys.argv so they don't break our parser
-    # Or just ignore unknown args
-    args, unknown = parser.parse_known_args()
+    args = parser.parse_args()
+    
+    # Manual Hydra initialization
+    with initialize(version_base=None, config_path="../../../conf"):
+        cfg = compose(config_name="defaults")
     
     run_benchmark(cfg, args.mode, args.dataset)
 
