@@ -1,0 +1,23 @@
+name: "G4KMU/t2-ragbench"
+runner_name: "tatqa"
+split: "TAT-DQA"
+language: "en"
+meta_data_keys:
+  - report_year
+  - company_name
+  - company_sector
+context_key: "context"
+answer_key: "answer"
+retrieval_query: "Given a question about tabular financial data, retrieve the correct table context."
+document_percentage: 1.0
+
+gsr:
+  alpha: 0.5
+  beta: 0.3
+  gamma: 0.2
+  gat_hidden_dim: 256
+  gat_num_heads: 4
+  gat_num_layers: 2
+  epsilon: 1.0e-4
+  top_k: 3
+  embedding_model: "intfloat/multilingual-e5-large-instruct"

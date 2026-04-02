@@ -1,0 +1,626 @@
+================================================================================
+1. LOADING DATASETS
+================================================================================
+FinQA:     8281 samples, columns: ['id', 'context_id', 'split', 'question', 'program_answer', 'original_answer', 'context', 'table', 'pre_text', 'post_text', 'file_name', 'company_name', 'company_symbol', 'report_year', 'page_number', 'company_sector', 'company_industry', 'company_headquarters', 'company_date_added', 'company_cik', 'company_founded']
+ConvFinQA: 3458 samples, columns: ['id', 'context_id', 'split', 'question', 'program_answer', 'original_answer', 'context', 'table', 'pre_text', 'post_text', 'file_name', 'company_name', 'company_symbol', 'report_year', 'page_number', 'company_sector', 'company_industry', 'company_headquarters', 'company_date_added', 'company_cik', 'company_founded']
+TAT-DQA:   11349 samples, columns: ['id', 'context_id', 'split', 'question', 'program_answer', 'original_answer', 'context', 'file_name', 'company_name', 'report_year', 'company_sector']
+VAQA: Could not load - Dataset 'G4KMU/va_qa' doesn't exist on the Hub or cannot be accessed.
+
+================================================================================
+2. BASIC STATISTICS PER DATASET
+================================================================================
+
+--- FinQA ---
+  n_samples: 8281
+  n_unique_contexts: 2789
+  ctx_char_mean: 4536.47
+  ctx_char_median: 4471.00
+  ctx_char_std: 1549.42
+  ctx_char_min: 531
+  ctx_char_max: 16303
+  ctx_word_mean: 727.74
+  ctx_word_median: 723.00
+  ctx_word_std: 255.77
+  q_char_mean: 179.38
+  q_word_mean: 28.75
+  q_word_median: 28.00
+  q_word_std: 8.06
+  q_word_min: 0
+  q_word_max: 81
+  n_answers: 8281
+  a_word_mean: 1.00
+  pct_numeric_answers: 100.00
+
+--- ConvFinQA ---
+  n_samples: 3458
+  n_unique_contexts: 1806
+  ctx_char_mean: 4000.57
+  ctx_char_median: 3984.50
+  ctx_char_std: 1508.18
+  ctx_char_min: 522
+  ctx_char_max: 14629
+  ctx_word_mean: 715.95
+  ctx_word_median: 712.00
+  ctx_word_std: 261.49
+  q_char_mean: 137.07
+  q_word_mean: 22.58
+  q_word_median: 22.00
+  q_word_std: 6.64
+  q_word_min: 0
+  q_word_max: 54
+  n_answers: 3458
+  a_word_mean: 1.00
+  pct_numeric_answers: 99.83
+
+--- TAT-DQA ---
+  n_samples: 11349
+  n_unique_contexts: 2722
+  ctx_char_mean: 4171.73
+  ctx_char_median: 3875.00
+  ctx_char_std: 1751.24
+  ctx_char_min: 340
+  ctx_char_max: 15073
+  ctx_word_mean: 586.98
+  ctx_word_median: 540.00
+  ctx_word_std: 252.87
+  q_char_mean: 136.50
+  q_word_mean: 22.40
+  q_word_median: 22.00
+  q_word_std: 6.38
+  q_word_min: 0
+  q_word_max: 68
+  n_answers: 11349
+  a_word_mean: 1.00
+  pct_numeric_answers: 99.03
+
+================================================================================
+3. CONTEXT STRUCTURE ANALYSIS
+================================================================================
+
+--- FinQA ---
+  pct_with_table: 100.00
+  avg_tables_per_doc: 1.01
+  avg_table_lines: 6.37
+  avg_total_lines: 29.68
+  avg_table_rows: 5.37
+  avg_table_cols: 4.85
+  avg_numbers_per_doc: 64.91
+  table_line_ratio: 0.21
+  avg_text_words: 616.69
+  avg_text_chars: 3635.87
+
+--- ConvFinQA ---
+  pct_with_table: 100.00
+  avg_tables_per_doc: 1.00
+  avg_table_lines: 7.36
+  avg_total_lines: 9.36
+  avg_table_rows: 6.36
+  avg_table_cols: 3.86
+  avg_numbers_per_doc: 60.73
+  table_line_ratio: 0.79
+  avg_text_words: 617.01
+  avg_text_chars: 3604.85
+
+--- TAT-DQA ---
+  pct_with_table: 97.59
+  avg_tables_per_doc: 2.22
+  avg_table_lines: 18.02
+  avg_total_lines: 41.47
+  avg_table_rows: 15.84
+  avg_table_cols: 3.56
+  avg_numbers_per_doc: 66.53
+  table_line_ratio: 0.43
+  avg_text_words: 414.30
+  avg_text_chars: 2711.57
+
+================================================================================
+4. QUESTION CHARACTERISTICS
+================================================================================
+
+--- FinQA: Question Type Distribution ---
+  what: 96.0%
+  how_much: 1.0%
+  how_many: 0.9%
+  percentage/ratio: 68.7%
+  change/difference: 38.4%
+  compare: 3.7%
+  calculate: 0.7%
+  total/sum: 42.3%
+  average/mean: 11.2%
+  year_reference: 98.2%
+  multi_step_indicator: 14.4%
+  has_entity_reference: 80.3%
+
+--- ConvFinQA: Question Type Distribution ---
+  what: 98.0%
+  how_much: 0.2%
+  how_many: 1.4%
+  percentage/ratio: 30.0%
+  change/difference: 31.0%
+  compare: 1.7%
+  calculate: 0.6%
+  total/sum: 37.8%
+  average/mean: 5.3%
+  year_reference: 98.3%
+  multi_step_indicator: 9.3%
+  has_entity_reference: 79.1%
+
+--- TAT-DQA: Question Type Distribution ---
+  what: 90.8%
+  how_much: 0.1%
+  how_many: 3.9%
+  percentage/ratio: 37.7%
+  change/difference: 42.2%
+  compare: 3.7%
+  calculate: 0.9%
+  total/sum: 24.7%
+  average/mean: 14.1%
+  year_reference: 96.1%
+  multi_step_indicator: 8.3%
+  has_entity_reference: 64.5%
+
+================================================================================
+5. VOCABULARY & DOMAIN-SPECIFIC TERMINOLOGY
+================================================================================
+
+--- FinQA: Financial Terms in Contexts (top 20) ---
+  net: 21991
+  stock: 20610
+  income: 15655
+  assets: 13326
+  total: 12627
+  operating: 12498
+  consolidated: 10263
+  capital: 10110
+  debt: 9609
+  fair value: 9079
+  equity: 8398
+  share: 7451
+  loss: 6054
+  liabilities: 5990
+  revenue: 5680
+  earnings: 5410
+  fiscal: 5221
+  segment: 4818
+  quarter: 4677
+  annual: 4002
+
+--- FinQA: Abbreviation Frequency in Contexts ---
+
+  Avg abbreviations per document: 0.00
+  Max abbreviations per document: 0
+  % docs with abbreviations: 0.0%
+
+--- FinQA: Financial Terms in Questions (top 15) ---
+  total: 3329
+  net: 1586
+  stock: 1008
+  operating: 860
+  annual: 740
+  consolidated: 697
+  income: 638
+  debt: 562
+  return: 544
+  assets: 526
+  revenue: 478
+  segment: 476
+  share: 435
+  fiscal: 421
+  capital: 361
+
+--- ConvFinQA: Financial Terms in Contexts (top 20) ---
+  stock: 9570
+  net: 9433
+  income: 6295
+  operating: 5443
+  assets: 5130
+  total: 5055
+  capital: 4190
+  consolidated: 3967
+  debt: 3744
+  fair value: 3669
+  share: 3422
+  equity: 3339
+  revenue: 2741
+  loss: 2513
+  liabilities: 2419
+  fiscal: 2299
+  earnings: 2100
+  quarter: 1991
+  segment: 1831
+  annual: 1679
+
+--- ConvFinQA: Abbreviation Frequency in Contexts ---
+
+  Avg abbreviations per document: 0.00
+  Max abbreviations per document: 0
+  % docs with abbreviations: 0.0%
+
+--- ConvFinQA: Financial Terms in Questions (top 15) ---
+  total: 1096
+  net: 785
+  stock: 432
+  operating: 310
+  revenue: 213
+  income: 195
+  annual: 194
+  return: 192
+  share: 191
+  consolidated: 184
+  fiscal: 181
+  debt: 164
+  segment: 162
+  fair value: 138
+  assets: 130
+
+--- TAT-DQA: Financial Terms in Contexts (top 20) ---
+  net: 34705
+  income: 30213
+  assets: 24692
+  total: 23077
+  fiscal: 21091
+  revenue: 20828
+  stock: 19926
+  operating: 18107
+  share: 16079
+  deferred: 13139
+  loss: 12754
+  liabilities: 12111
+  consolidated: 11631
+  fair value: 10078
+  debt: 8752
+  earnings: 7914
+  capital: 7688
+  equity: 7147
+  segment: 6210
+  profit: 6001
+
+--- TAT-DQA: Abbreviation Frequency in Contexts ---
+  EBITDA: 3396
+  GAAP: 2799
+  IFRS: 1692
+  R&D: 835
+  EPS: 811
+  USD: 615
+  SEC: 501
+  CEO: 406
+  EUR: 278
+  FY: 272
+  IPO: 270
+  Q4: 265
+  EBIT: 259
+  NAV: 252
+  NASDAQ: 156
+
+  Avg abbreviations per document: 1.20
+  Max abbreviations per document: 38
+  % docs with abbreviations: 26.8%
+
+--- TAT-DQA: Financial Terms in Questions (top 15) ---
+  total: 2545
+  fiscal: 1956
+  net: 1757
+  income: 1405
+  revenue: 1078
+  assets: 990
+  operating: 717
+  stock: 684
+  share: 601
+  consolidated: 547
+  deferred: 457
+  fair value: 378
+  segment: 371
+  loss: 370
+  gross: 353
+
+================================================================================
+6. NUMERICAL DENSITY & COMPLEXITY
+================================================================================
+
+--- FinQA: Numerical Density ---
+  Context:
+    Avg numbers per doc: 70.6
+    Avg monetary values per doc: 7.0
+    Avg percentages per doc: 5.5
+    Avg year references per doc: 18.6
+    Number-to-word ratio: 0.1030
+    Median numbers per doc: 64
+    Max numbers per doc: 339
+  Questions:
+    Avg numbers per question: 2.74
+    % questions with numbers: 99.3%
+
+--- ConvFinQA: Numerical Density ---
+  Context:
+    Avg numbers per doc: 66.0
+    Avg monetary values per doc: 7.2
+    Avg percentages per doc: 5.8
+    Avg year references per doc: 18.9
+    Number-to-word ratio: 0.0979
+    Median numbers per doc: 59
+    Max numbers per doc: 320
+  Questions:
+    Avg numbers per question: 2.21
+    % questions with numbers: 99.1%
+
+--- TAT-DQA: Numerical Density ---
+  Context:
+    Avg numbers per doc: 67.0
+    Avg monetary values per doc: 12.4
+    Avg percentages per doc: 3.8
+    Avg year references per doc: 15.2
+    Number-to-word ratio: 0.1206
+    Median numbers per doc: 63
+    Max numbers per doc: 330
+  Questions:
+    Avg numbers per question: 2.34
+    % questions with numbers: 98.0%
+
+================================================================================
+7. LEXICAL OVERLAP ANALYSIS (Query vs Context)
+================================================================================
+
+--- FinQA: Lexical Overlap ---
+  Avg overlapping tokens: 12.26
+  Avg Jaccard similarity: 0.0692
+  Avg query coverage (% query tokens found in context): 0.7566
+  Median query coverage: 0.7692
+  % queries with <30% coverage: 0.1%
+  % queries with <50% coverage: 2.4%
+
+--- ConvFinQA: Lexical Overlap ---
+  Avg overlapping tokens: 10.20
+  Avg Jaccard similarity: 0.0600
+  Avg query coverage (% query tokens found in context): 0.7953
+  Median query coverage: 0.8125
+  % queries with <30% coverage: 0.2%
+  % queries with <50% coverage: 1.9%
+
+--- TAT-DQA: Lexical Overlap ---
+  Avg overlapping tokens: 9.17
+  Avg Jaccard similarity: 0.0565
+  Avg query coverage (% query tokens found in context): 0.7162
+  Median query coverage: 0.7273
+  % queries with <30% coverage: 0.6%
+  % queries with <50% coverage: 6.1%
+
+================================================================================
+8. HARD NEGATIVE ANALYSIS - Context Similarity
+================================================================================
+
+--- FinQA: Hard Negative Analysis (n=500 unique contexts) ---
+  TF-IDF Cosine Similarity Distribution:
+    Mean: 0.0693
+    Median: 0.0536
+    Std: 0.0600
+    P75: 0.0867
+    P90: 0.1331
+    P95: 0.1741
+    P99: 0.3053
+    Max: 0.9736
+    % pairs with sim > 0.3: 1.068%
+    % pairs with sim > 0.5: 0.135%
+    % pairs with sim > 0.7: 0.044%
+    % pairs with sim > 0.8: 0.030%
+    % pairs with sim > 0.9: 0.007%
+
+  Example high-similarity pair (sim > 0.7):
+    Doc A (first 200 chars): net sales of the retail segment grew to $ 1.185 billion during 2004 from $ 621 million and $ 283 million , in 2003 and 2002 , respectively .
+the increases in net sales during both 2004 and 2003 reflec
+    Doc B (first 200 chars): 24 of 93 net sales in japan remained flat during 2002 versus 2001 , with a slight decline in unit sales of 2% ( 2 % ) .
+consistent with the company 2019s other geographic operating segments , during 2
+    Similarity: 0.7805
+
+--- ConvFinQA: Hard Negative Analysis (n=500 unique contexts) ---
+  TF-IDF Cosine Similarity Distribution:
+    Mean: 0.0719
+    Median: 0.0562
+    Std: 0.0610
+    P75: 0.0902
+    P90: 0.1377
+    P95: 0.1783
+    P99: 0.3078
+    Max: 0.9857
+    % pairs with sim > 0.3: 1.080%
+    % pairs with sim > 0.5: 0.137%
+    % pairs with sim > 0.7: 0.051%
+    % pairs with sim > 0.8: 0.034%
+    % pairs with sim > 0.9: 0.010%
+
+  Example high-similarity pair (sim > 0.7):
+    Doc A (first 200 chars): recourse and repurchase obligations as discussed in note 3 loan sale and servicing activities and variable interest entities , pnc has sold commercial mortgage , residential mortgage and home equity l
+    Doc B (first 200 chars): the table below reflects the estimated effects on pension expense of certain changes in annual assumptions , using 2012 estimated expense as a baseline . change in assumption ( a ) estimated increase 
+    Similarity: 0.8669
+
+--- TAT-DQA: Hard Negative Analysis (n=500 unique contexts) ---
+  TF-IDF Cosine Similarity Distribution:
+    Mean: 0.0816
+    Median: 0.0671
+    Std: 0.0616
+    P75: 0.1019
+    P90: 0.1485
+    P95: 0.1921
+    P99: 0.3216
+    Max: 1.0000
+    % pairs with sim > 0.3: 1.259%
+    % pairs with sim > 0.5: 0.131%
+    % pairs with sim > 0.7: 0.021%
+    % pairs with sim > 0.8: 0.014%
+    % pairs with sim > 0.9: 0.008%
+
+  Example high-similarity pair (sim > 0.7):
+    Doc A (first 200 chars): 3. OPERATING AND FINANCIAL RESULTS
+
+3.1 OPERATING RESULTS
+
+Years ended August 31,          2019   (1)      2018   (2)      Change          Change in          Foreign       (in thousands of dollars, ex
+    Doc B (first 200 chars): 3. OPERATING AND FINANCIAL RESULTS
+
+3.1 OPERATING RESULTS
+
+|                               | 2019 (1) | 2018 (2) | Change | Change in constant currency (3) | Foreign exchange impact (3) |
+|-----------
+    Similarity: 0.9086
+
+================================================================================
+9. CONTEXT DUPLICATION & MULTI-QUESTION ANALYSIS
+================================================================================
+
+--- FinQA: Context Sharing ---
+  Total questions: 8281
+  Unique contexts: 2789
+  Questions per context:
+    Mean: 2.97
+    Median: 3
+    Max: 6
+    % contexts with >1 question: 92.3%
+    % contexts with >3 questions: 41.8%
+    % contexts with >5 questions: 0.7%
+
+--- ConvFinQA: Context Sharing ---
+  Total questions: 3458
+  Unique contexts: 1806
+  Questions per context:
+    Mean: 1.91
+    Median: 2
+    Max: 7
+    % contexts with >1 question: 56.9%
+    % contexts with >3 questions: 7.9%
+    % contexts with >5 questions: 0.1%
+
+--- TAT-DQA: Context Sharing ---
+  Total questions: 11349
+  Unique contexts: 2722
+  Questions per context:
+    Mean: 4.17
+    Median: 4
+    Max: 9
+    % contexts with >1 question: 99.7%
+    % contexts with >3 questions: 67.7%
+    % contexts with >5 questions: 12.3%
+
+================================================================================
+10. REASONING COMPLEXITY (FinQA Programs)
+================================================================================
+
+================================================================================
+11. SAMPLE EXAMPLES - Illustration of Retrieval Challenges
+================================================================================
+
+--- Example 1: FinQA question vs context ---
+  Question: What was Analog Devices reported interest expense for fiscal year 2009, as listed in its annual report?
+  Answer: 3.8
+  Context (first 500 chars): interest rate to a variable interest rate based on the three-month libor plus 2.05% ( 2.05 % ) ( 2.34% ( 2.34 % ) as of october 31 , 2009 ) .
+if libor changes by 100 basis points , our annual interest expense would change by $ 3.8 million .
+foreign currency exposure as more fully described in note 2i .
+in the notes to consolidated financial statements contained in item 8 of this annual report on form 10-k , we regularly hedge our non-u.s .
+dollar-based exposures by entering into forward foreign 
+
+--- Example 2: Another FinQA ---
+  Question: What is the net change in unrecognized tax benefits for Skyworks Solutions from September 30, 2011, to September 28, 2012, in millions?
+  Answer: 20.299999999999997
+  Context (first 500 chars): skyworks solutions , inc .
+notes to consolidated financial statements 2014 ( continued ) maintained a valuation allowance of $ 47.0 million .
+this valuation allowance is comprised of $ 33.6 million related to u.s .
+state tax credits , of which $ 3.6 million are state tax credits acquired from aati in fiscal year 2012 , and $ 13.4 million related to foreign deferred tax assets .
+if these benefits are recognized in a future period the valuation allowance on deferred tax assets will be reversed and
+
+--- Example 3: TAT-DQA ---
+  Question: What was the amount of Income before income taxes for carpenter-technology-corp in the year ended June 30, 2019?
+  Answer: 216.0
+  Context (first 500 chars): The changes in AOCI associated with derivative hedging activities during the years ended June 30, 2019, 2018 and 2017 were as follows:
+
+| ($ in millions) | 2019          | 2018       | 2017       |
+|-----------------|---------------|------------|------------|
+| Balance, beginning                       | $ 23.8       | $(2.3)     | $(21.8)    |
+| Cumulative adjustment upon adoption of ASU 2017-12 reclassified to reinvested earnings | (1.0)        | —          | —          |
+| Current period chang
+
+================================================================================
+12. COMPANY & SECTOR DISTRIBUTION
+================================================================================
+
+--- FinQA ---
+  Top sectors:
+    Financials: 2191 (26.5%)
+    Industrials: 1312 (15.8%)
+    Utilities: 767 (9.3%)
+    Information Technology: 733 (8.9%)
+    Materials: 733 (8.9%)
+    Real Estate: 558 (6.7%)
+    Energy: 473 (5.7%)
+    Health Care: 429 (5.2%)
+    Consumer Discretionary: 381 (4.6%)
+    Communication Services: 287 (3.5%)
+  Unique companies: 136
+
+--- ConvFinQA ---
+  Top sectors:
+    Financials: 823 (23.8%)
+    Industrials: 556 (16.1%)
+    Utilities: 354 (10.2%)
+    Information Technology: 307 (8.9%)
+    Materials: 287 (8.3%)
+    Real Estate: 250 (7.2%)
+    Energy: 200 (5.8%)
+    Health Care: 192 (5.6%)
+    Consumer Discretionary: 190 (5.5%)
+    Communication Services: 136 (3.9%)
+  Unique companies: 132
+
+--- TAT-DQA ---
+  Top sectors:
+    Telecommunications: 982 (8.7%)
+    Semiconductors: 763 (6.7%)
+    Software: 719 (6.3%)
+    Electronics Manufacturing: 541 (4.8%)
+    Financial Technology: 472 (4.2%)
+    Shipping: 465 (4.1%)
+    Technology: 439 (3.9%)
+    Cybersecurity: 353 (3.1%)
+    Semiconductor Equipment: 306 (2.7%)
+    Enterprise Software: 244 (2.1%)
+  Unique companies: 173
+
+================================================================================
+13. SUMMARY - KEY FINDINGS FOR RETRIEVAL DIFFICULTY
+================================================================================
+
+KEY FACTORS WHY GENERAL RETRIEVAL FAILS ON FINANCIAL DOCUMENTS:
+
+1. HIGH TABLE DENSITY: Financial documents are dominated by markdown tables
+   with dense numerical data. General retrievers trained on natural text 
+   struggle with structured tabular content.
+
+2. EXTREME NUMERICAL DENSITY: Documents contain massive amounts of numbers
+   (monetary values, percentages, dates, ratios). These numbers are critical 
+   for answering questions but are poorly handled by text embeddings.
+
+3. LOW LEXICAL OVERLAP: Questions are often reformulated to be context-independent,
+   reducing direct keyword overlap with source documents. This hurts BM25-style 
+   sparse retrieval.
+
+4. HARD NEGATIVES: Financial documents from the same company/sector/period share
+   very similar vocabulary and structure, creating many near-duplicate contexts that
+   confuse dense retrievers.
+
+5. DOMAIN-SPECIFIC TERMINOLOGY: Heavy use of financial abbreviations (EBITDA, EPS, 
+   GAAP, etc.) and technical terms that may not be well-represented in general-purpose
+   embedding models.
+
+6. MULTI-STEP REASONING REQUIREMENTS: Questions often require extracting multiple 
+   values from tables and performing calculations, but the retrieval query doesn't
+   capture this computational intent.
+
+7. CONTEXT SHARING: Multiple different questions may reference the same context but
+   require different pieces of information, making single-vector representations 
+   insufficient.
+
+
+EDA ANALYSIS COMPLETE!
+Exception ignored in: <function ResourceTracker.__del__ at 0x1165549a0>
+Traceback (most recent call last):
+  File "/Users/nnminh322/miniconda3/envs/master/lib/python3.12/site-packages/multiprocess/resource_tracker.py", line 80, in __del__
+  File "/Users/nnminh322/miniconda3/envs/master/lib/python3.12/site-packages/multiprocess/resource_tracker.py", line 89, in _stop
+  File "/Users/nnminh322/miniconda3/envs/master/lib/python3.12/site-packages/multiprocess/resource_tracker.py", line 102, in _stop_locked
+AttributeError: '_thread.RLock' object has no attribute '_recursion_count'

@@ -1,0 +1,151 @@
+================================================================================
+A. BM25-STYLE RETRIEVAL FAILURE ANALYSIS
+================================================================================
+
+--- FinQA ---
+  TF-IDF Retrieval (proxy for BM25):
+    Recall@1: 37.7%
+    Recall@3: 59.7%
+    Recall@5: 69.0%
+    MRR: 0.5163
+    Mean rank: 10.0
+    Median rank: 2
+    % ranked >10: 21.7%
+    % ranked >50: 4.0%
+    % ranked >100: 1.7%
+
+--- TAT-DQA ---
+  TF-IDF Retrieval (proxy for BM25):
+    Recall@1: 24.7%
+    Recall@3: 41.3%
+    Recall@5: 51.0%
+    MRR: 0.3683
+    Mean rank: 54.2
+    Median rank: 5
+    % ranked >10: 39.7%
+    % ranked >50: 17.0%
+    % ranked >100: 10.3%
+
+================================================================================
+B. HARD NEGATIVE DEEP DIVE: Why wrong contexts score high
+================================================================================
+
+--- FinQA: Similarity Gap (correct - top wrong) ---
+  Mean gap: -0.0272
+  Median gap: -0.0195
+  % where wrong > correct (negative gap): 59.5%
+  % where gap < 0.01: 65.5%
+  % where gap < 0.05: 79.0%
+  Avg correct context sim: 0.3266
+  Avg top wrong context sim: 0.3538
+
+  Top 5 CONFUSED examples (wrong > correct):
+    Q: What was the total equity for JPMorgan Chase in 2009, as reported in their annual report, in millions of dollars?
+    Correct sim: 0.1113, Wrong sim: 0.4672, Gap: -0.3559
+
+    Q: What is the percentage change in capitalized interest from 2017 to 2018 for Norwegian Cruise Line Holdings, as disclosed in their 2018 financial repor
+    Correct sim: 0.0879, Wrong sim: 0.4024, Gap: -0.3145
+
+    Q: What is the average operating income of Air Products' Industrial Gases segment in the Americas for the years 2014-2016, as reported in the company's 2
+    Correct sim: 0.1895, Wrong sim: 0.4861, Gap: -0.2966
+
+    Q: What is the percentage increase in total compensation expense under the stock plan for Mid-America Apartment Communities from 2015 to 2016?
+    Correct sim: 0.1439, Wrong sim: 0.4354, Gap: -0.2915
+
+    Q: What is the net change in the balance of net foreign exchange translation for Aon Corporation from 2006 to 2007, as reported in the notes to consolida
+    Correct sim: 0.1713, Wrong sim: 0.4418, Gap: -0.2705
+
+================================================================================
+C. TABLE vs TEXT: Where is the retrieval signal?
+================================================================================
+
+--- FinQA ---
+  Query-Table similarity (avg): 0.2163
+  Query-Text similarity (avg):  0.3039
+  Ratio (table/text): 0.7119
+  % where table > text: 30.6%
+  % where table sim < 0.01: 6.8%
+
+--- TAT-DQA ---
+  Query-Table similarity (avg): 0.2205
+  Query-Text similarity (avg):  0.2247
+  Ratio (table/text): 0.9813
+  % where table > text: 48.8%
+  % where table sim < 0.01: 5.4%
+
+================================================================================
+D. NUMERICAL VALUE OVERLAP BETWEEN QUERY AND CONTEXT
+================================================================================
+
+--- FinQA ---
+  Avg numbers in question: 2.43
+  Avg numbers in context: 38.88
+  Avg numerical overlap (query nums found in context): 0.9763
+  Median numerical overlap: 1.0000
+  % with 0% numeric overlap: 0.7%
+  % with >50% numeric overlap: 97.7%
+  % with 100% numeric overlap: 94.6%
+
+--- TAT-DQA ---
+  Avg numbers in question: 2.14
+  Avg numbers in context: 43.22
+  Avg numerical overlap (query nums found in context): 0.9615
+  Median numerical overlap: 1.0000
+  % with 0% numeric overlap: 1.2%
+  % with >50% numeric overlap: 95.7%
+  % with 100% numeric overlap: 92.2%
+
+================================================================================
+E. DOCUMENT LENGTH DISTRIBUTION (Token Estimation)
+================================================================================
+
+--- FinQA ---
+  Avg estimated tokens: 946
+  Median estimated tokens: 940
+  P90 estimated tokens: 1326
+  P95 estimated tokens: 1447
+  Max estimated tokens: 3511
+  % > 512 tokens: 91.0%
+  % > 1024 tokens: 36.8%
+  % > 2048 tokens: 0.9%
+
+--- ConvFinQA ---
+  Avg estimated tokens: 931
+  Median estimated tokens: 926
+  P90 estimated tokens: 1311
+  P95 estimated tokens: 1424
+  Max estimated tokens: 3074
+  % > 512 tokens: 89.7%
+  % > 1024 tokens: 34.6%
+  % > 2048 tokens: 1.0%
+
+--- TAT-DQA ---
+  Avg estimated tokens: 763
+  Median estimated tokens: 702
+  P90 estimated tokens: 1161
+  P95 estimated tokens: 1464
+  Max estimated tokens: 3124
+  % > 512 tokens: 82.1%
+  % > 1024 tokens: 13.7%
+  % > 2048 tokens: 0.5%
+
+================================================================================
+F. SAME-COMPANY CONTEXT SIMILARITY (Intra vs Inter)
+================================================================================
+
+--- FinQA ---
+  Same-company pairs: 2143
+  Different-company pairs: 122607
+  Avg intra-company similarity: 0.1895
+  Avg inter-company similarity: 0.0672
+  Ratio (intra/inter): 2.82x
+  Median intra-company similarity: 0.1315
+  Median inter-company similarity: 0.0530
+
+SUPPLEMENTARY ANALYSIS COMPLETE!
+Exception ignored in: <function ResourceTracker.__del__ at 0x155f5c5e0>
+Traceback (most recent call last):
+  File "/Users/nnminh322/miniconda3/envs/master/lib/python3.12/site-packages/multiprocess/resource_tracker.py", line 80, in __del__
+  File "/Users/nnminh322/miniconda3/envs/master/lib/python3.12/site-packages/multiprocess/resource_tracker.py", line 89, in _stop
+  File "/Users/nnminh322/miniconda3/envs/master/lib/python3.12/site-packages/multiprocess/resource_tracker.py", line 102, in _stop_locked
+AttributeError: '_thread.RLock' object has no attribute '_recursion_count'

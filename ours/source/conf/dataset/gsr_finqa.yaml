@@ -1,0 +1,24 @@
+name: "G4KMU/t2-ragbench"
+runner_name: "finqa"
+split: "FinQA"
+language: "en"
+meta_data_keys:
+  - report_year
+  - company_name
+  - company_sector
+context_key: "context"
+answer_key: "answer"
+retrieval_query: "Given a question about a company, retrieve relevant passages that answer the query."
+document_percentage: 1.0
+
+# GSR-specific parameters
+gsr:
+  alpha: 0.5     # text similarity weight
+  beta: 0.3      # entity matching weight
+  gamma: 0.2     # constraint score weight
+  gat_hidden_dim: 256
+  gat_num_heads: 4
+  gat_num_layers: 2
+  epsilon: 1.0e-4   # constraint tolerance
+  top_k: 3
+  embedding_model: "intfloat/multilingual-e5-large-instruct"
