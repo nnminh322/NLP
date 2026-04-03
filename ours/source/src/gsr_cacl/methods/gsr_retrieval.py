@@ -68,12 +68,15 @@ class GSRRetrieval:
         # Step 1: FAISS text index
         self._build_faiss_index()
 
+        # Infer embedding dimension from the first document
+        self._embed_dim = len(self.doc_text_embeds[0]) if len(self.doc_text_embeds) > 0 else 768
+
         # Step 2: Constraint KGs for all docs
         self._build_all_kgs()
 
         # GAT encoder (§4.3)
         self.gat_encoder = GATEncoder(
-            embed_dim=768,
+            embed_dim=self._embed_dim,
             hidden_dim=gat_hidden_dim,
             num_heads=gat_num_heads,
             num_layers=gat_num_layers,
@@ -81,7 +84,7 @@ class GSRRetrieval:
 
         # Joint scorer (§4.4)
         self.scorer = JointScorer(
-            text_embed_dim=768,
+            text_embed_dim=self._embed_dim,
             kg_embed_dim=gat_hidden_dim,
         ).to(self.device)
 

@@ -31,7 +31,7 @@ dependencies = [
     "langchain_huggingface>=0.0.3",
     "langchain-community>=0.2.16",
     # Retrieval
-    "rank-bm25>=0.3",
+    "rank-bm25>=0.2",
     "faiss-cpu>=1.7.4",
     # Dataset / evaluation
     "datasets>=3.0.0",

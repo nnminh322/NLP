@@ -322,7 +322,7 @@ def stage_joint(
     scorer.train()
     gat_encoder.train()
     for epoch in range(epochs):
-        total = triplet_total = const_total = 0.0
+        total = trip_loss_total = const_loss_total = 0.0
         n_batches = 0
 
         for batch in tqdm(dataloader, desc=f"Joint Epoch {epoch+1}/{epochs}"):
@@ -389,16 +389,16 @@ def stage_joint(
             optimizer.step()
 
             total += losses["total"].item()
-            triplet_total += losses["triplet"].item()
-            const_total += losses["constraint"].item()
+            trip_loss_total += losses["triplet"].item()
+            const_loss_total += losses["constraint"].item()
             n_batches += 1
 
         scheduler.step()
         logger.info(
             f"Epoch {epoch+1} — "
             f"Loss: {total/max(n_batches,1):.4f} "
-            f"(triplet={triplet_total/max(n_batches,1):.4f}, "
-            f"constraint={const_total/max(n_batches,1):.4f})"
+            f"(triplet={trip_loss_total/max(n_batches,1):.4f}, "
+            f"constraint={const_loss_total/max(n_batches,1):.4f})"
         )
 
         # Checkpoint

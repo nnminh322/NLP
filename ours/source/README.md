@@ -26,16 +26,19 @@ retrieving financial text+table documents.
 ```python
 # Cell 1: Clone & Install
 !git clone https://github.com/<YOUR_REPO>/gsr-cacl.git /kaggle/working/gsr-cacl
-%cd /kaggle/working/gsr-cacl/ours/source
+
+# Cell 2: Change directory and install
+import os
+os.chdir("/kaggle/working/gsr-cacl/ours/source")
 !pip install -e ".[gpu]" --quiet
 !pip install peft accelerate transformers --quiet
 
-# Cell 2: Verify GPU
+# Cell 3: Verify GPU
 import torch
 print(f"GPU: {torch.cuda.get_device_name(0)}")
 print(f"VRAM: {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB")
 
-# Cell 3: Train (LoRA on T4 — recommended for 16GB VRAM)
+# Cell 4: Train (LoRA on T4 — recommended for 16GB VRAM)
 !python -m gsr_cacl.train \
     --dataset finqa \
     --stage all \
@@ -44,7 +47,7 @@ print(f"VRAM: {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB")
     --gradient-checkpointing \
     --save /kaggle/working/outputs
 
-# Cell 4: Benchmark
+# Cell 5: Benchmark
 !python -m gsr_cacl.benchmark_gsr --mode gsr --dataset finqa --top-k 3
 ```
 
@@ -53,18 +56,26 @@ print(f"VRAM: {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB")
 ```python
 # Cell 1: Clone & Install
 !git clone https://github.com/<YOUR_REPO>/gsr-cacl.git /content/gsr-cacl
-%cd /content/gsr-cacl/ours/source
+
+# Cell 2: Change directory and install
+import os
+os.chdir("/content/gsr-cacl/ours/source")
 !pip install -e ".[gpu]" --quiet
 !pip install peft accelerate transformers --quiet
 
-# Cell 2: Train
+# Cell 3: Verify GPU
+import torch
+print(f"GPU: {torch.cuda.get_device_name(0)}")
+print(f"VRAM: {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB")
+
+# Cell 4: Train
 # For free T4 (16GB VRAM):
 !python -m gsr_cacl.train --dataset finqa --stage all --preset t4 --gradient-checkpointing
 
 # For Colab Pro A100 (40GB VRAM):
 !python -m gsr_cacl.train --dataset finqa --stage all --preset a100
 
-# Cell 3: Benchmark
+# Cell 5: Benchmark
 !python -m gsr_cacl.benchmark_gsr --mode gsr --dataset finqa --top-k 3
 ```
 

@@ -174,11 +174,14 @@ class JointScorer(nn.Module):
         d = doc_text_embed.unsqueeze(0).to(device)
         kg = kg_embed.unsqueeze(0).to(device)
 
+        # Text similarity (enriched by KG)
         s_text = self.forward_text_sim(q, d, kg).item()
 
+        # Constraint score (pre-computed)
         cs_feats = self.build_constraint_features([constraint_result], device)
         s_constraint = self.forward_constraint(cs_feats).item()
 
+        # Weighted combination
         return float(
             self.alpha.item() * s_text
             + self.beta.item() * entity_score
