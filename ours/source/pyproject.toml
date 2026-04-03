@@ -19,7 +19,13 @@ dependencies = [
     # Core ML
     "torch>=2.0.0",
     "numpy>=1.24.0",
-    # Embeddings
+    # Transformer backbone (differentiable text encoder)
+    "transformers>=4.36.0",
+    "tokenizers>=0.15.0",
+    "accelerate>=0.25.0",
+    # LoRA fine-tuning
+    "peft>=0.7.0",
+    # Embeddings (for inference / benchmark compatibility)
     "langchain-core>=0.2.32",
     "langchain>=0.2.14",
     "langchain_huggingface>=0.0.3",

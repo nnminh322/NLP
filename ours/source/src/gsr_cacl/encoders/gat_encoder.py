@@ -1,6 +1,21 @@
-"""Full GAT Encoder for financial table cells."""
+"""Full GAT Encoder for financial table cells.
+
+Architecture (architecture.md §3):
+    Input:  [CellEmbed(value, header) ⊕ PosEnc(row) ⊕ PosEnc(col)]
+    Layer 1: GAT → LeakyReLU
+    Layer 2: GAT → LeakyReLU
+    Output: node embeddings [V, hidden_dim]
+
+Cell embedding strategy:
+    - Numeric value: log-scale encoding projected to embed_dim
+    - Header text: learnable hash-based embedding (lightweight, no BGE needed at train time)
+    - External BGE embeddings can be injected via encode_with_external_embeds()
+"""
 
 from __future__ import annotations
+
+import math
+from typing import Optional
 
 import torch
 import torch.nn as nn
@@ -10,16 +25,55 @@ from gsr_cacl.encoders.positional import SinusoidalPositionalEncoding
 from gsr_cacl.encoders.gat_layer import GATLayer
 
 
+def _numeric_features(value: Optional[float], device: torch.device) -> torch.Tensor:
+    """Encode a numeric value into a small feature vector [4].
+
+    Features: [log|v|, sign, is_zero, magnitude_bucket]
+    """
+    if value is None or math.isnan(value) or math.isinf(value):
+        return torch.zeros(4, device=device)
+    sign = 1.0 if value >= 0 else -1.0
+    is_zero = 1.0 if abs(value) < 1e-8 else 0.0
+    log_abs = math.log1p(abs(value))
+    # magnitude bucket: 0=tiny, 1=small, 2=medium, 3=large, 4=huge
+    if abs(value) < 1:
+        bucket = 0.0
+    elif abs(value) < 1e3:
+        bucket = 1.0
+    elif abs(value) < 1e6:
+        bucket = 2.0
+    elif abs(value) < 1e9:
+        bucket = 3.0
+    else:
+        bucket = 4.0
+    return torch.tensor([log_abs, sign, is_zero, bucket / 4.0], device=device)
+
+
+def _header_hash(text: str, n_buckets: int = 512) -> int:
+    """Deterministic hash of header text to bucket index."""
+    h = 0
+    for c in text.lower().strip():
+        h = (h * 31 + ord(c)) % n_buckets
+    return h
+
+
 class GATEncoder(nn.Module):
     """
     Two-layer GAT encoder for financial table cells.
 
     Architecture:
-        Input:  [BGE(cell_text) ⊕ PosEnc(row) ⊕ PosEnc(col)]
+        Input:  [CellEmbed ⊕ PosEnc(row) ⊕ PosEnc(col)]
         Layer 1: GAT → LeakyReLU
         Layer 2: GAT → LeakyReLU
         Output: node embeddings [V, hidden_dim]
+
+    Cell embedding (learnable, no external model needed):
+        - header_embed: learnable embedding table indexed by header hash
+        - numeric_proj: projects [log|v|, sign, is_zero, mag_bucket] → embed_dim
+        Combined: cell_embed = header_embed + numeric_proj(features)
     """
+
+    HEADER_BUCKETS = 512
 
     def __init__(
         self,
@@ -35,6 +89,15 @@ class GATEncoder(nn.Module):
         self.num_heads = num_heads
         self.num_layers = num_layers
 
+        # Cell embedding components
+        self.header_embed = nn.Embedding(self.HEADER_BUCKETS, embed_dim)
+        self.numeric_proj = nn.Sequential(
+            nn.Linear(4, embed_dim),
+            nn.ReLU(),
+        )
+        self.cell_norm = nn.LayerNorm(embed_dim)
+
+        # Positional encodings for row/col
         self.row_pe = SinusoidalPositionalEncoding(embed_dim // 4, max_len=256)
         self.col_pe = SinusoidalPositionalEncoding(embed_dim // 4, max_len=64)
 
@@ -51,12 +114,42 @@ class GATEncoder(nn.Module):
             for _ in range(num_layers)
         ])
 
-    def forward(self, kg: ConstraintKG) -> torch.Tensor:
+    def _build_cell_embeddings(self, kg: ConstraintKG, device: torch.device) -> torch.Tensor:
+        """Build learnable cell embeddings from header text + numeric value.
+
+        Returns: [V, embed_dim]
+        """
+        V = len(kg.nodes)
+
+        # Header hash → embedding
+        header_indices = torch.tensor(
+            [_header_hash(n.header, self.HEADER_BUCKETS) for n in kg.nodes],
+            dtype=torch.long, device=device,
+        )
+        h_embed = self.header_embed(header_indices)  # [V, embed_dim]
+
+        # Numeric features → projection
+        num_feats = torch.stack(
+            [_numeric_features(n.value, device) for n in kg.nodes], dim=0
+        )  # [V, 4]
+        n_embed = self.numeric_proj(num_feats)  # [V, embed_dim]
+
+        # Combine: additive fusion + layer norm
+        cell_embed = self.cell_norm(h_embed + n_embed)
+        return cell_embed
+
+    def forward(
+        self,
+        kg: ConstraintKG,
+        external_cell_embeds: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
         """
         Encode all nodes of a knowledge graph.
 
         Args:
             kg: ConstraintKG with pre-computed nodes
+            external_cell_embeds: Optional [V, embed_dim] tensor (e.g. from BGE).
+                If provided, uses these instead of learnable cell embeddings.
         Returns:
             node_embeddings: [V, hidden_dim]
         """
@@ -66,8 +159,11 @@ class GATEncoder(nn.Module):
         V = len(kg.nodes)
         device = next(self.parameters()).device
 
-        # Placeholder cell embeddings — replace with real BGE in full pipeline
-        cell_embeds = torch.zeros(V, self.embed_dim, device=device)
+        # Cell embeddings: external (BGE) or learnable
+        if external_cell_embeds is not None:
+            cell_embeds = external_cell_embeds.to(device)
+        else:
+            cell_embeds = self._build_cell_embeddings(kg, device)
 
         row_indices = torch.tensor(
             [n.row_idx for n in kg.nodes], dtype=torch.long, device=device
@@ -89,6 +185,16 @@ class GATEncoder(nn.Module):
             h = layer(h, edge_index, edge_weight)
 
         return h
+
+    def encode_graph(self, kg: ConstraintKG, external_cell_embeds: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """Encode a KG and return graph-level embedding via mean pooling.
+
+        Returns: [hidden_dim]
+        """
+        node_embeds = self.forward(kg, external_cell_embeds=external_cell_embeds)
+        if node_embeds.numel() == 0:
+            return torch.zeros(self.hidden_dim, device=next(self.parameters()).device)
+        return node_embeds.mean(dim=0)
 
     def _build_edge_index(self, kg: ConstraintKG, device: torch.device) -> torch.Tensor:
         if not kg.edges:

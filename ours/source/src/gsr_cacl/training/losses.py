@@ -25,7 +25,12 @@ class TripletLoss(nn.Module):
 class ConstraintViolationLoss(nn.Module):
     """
     Penalise high scores on constraint-violating negatives.
-    L = −(1/N) Σ 1[violates] · log σ(s(Q,C−))
+    L = −(1/N) Σ 1[violates] · log σ(−s(Q,C−))
+
+    When s(Q,C-) is high and doc violates constraints:
+        σ(-s) → 0, log σ(-s) → -∞, loss → +∞ (strong penalty)
+    When s(Q,C-) is low:
+        σ(-s) → 1, log σ(-s) → 0, loss → 0 (no penalty)
     """
 
     def forward(
@@ -33,8 +38,9 @@ class ConstraintViolationLoss(nn.Module):
         neg_scores: torch.Tensor,
         violates_mask: torch.Tensor,
     ) -> torch.Tensor:
-        log_prob = -F.softplus(-neg_scores)
-        loss = -(violates_mask * log_prob).mean()
+        # log σ(-s) = -softplus(s) — numerically stable
+        log_sigma_neg_s = -F.softplus(neg_scores)
+        loss = -(violates_mask * log_sigma_neg_s).mean()
         return loss
 
 

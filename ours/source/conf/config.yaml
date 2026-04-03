@@ -14,12 +14,14 @@ eval:
 
 # Training
 training:
-  stage: "joint"           # "identity" | "structural" | "joint"
+  stage: "joint"           # "identity" | "structural" | "joint" | "all"
   epochs: 5
-  batch_size: 16
+  batch_size: 8
   lr: 5.0e-5
   margin: 0.2
   lambda_constraint: 0.5
+  finetune: "lora"         # "full" | "lora" | "frozen"
+  gradient_checkpointing: false
 
 # HybridGSR-specific
 hybrid:

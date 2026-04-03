@@ -19,17 +19,94 @@ retrieving financial text+table documents.
 
 ---
 
-## Installation
+## Cloud Setup (Kaggle / Google Colab)
+
+### Option A: Kaggle Notebook (T4 GPU, 16GB VRAM — Free)
+
+```python
+# Cell 1: Clone & Install
+!git clone https://github.com/<YOUR_REPO>/gsr-cacl.git /kaggle/working/gsr-cacl
+%cd /kaggle/working/gsr-cacl/ours/source
+!pip install -e ".[gpu]" --quiet
+!pip install peft accelerate transformers --quiet
+
+# Cell 2: Verify GPU
+import torch
+print(f"GPU: {torch.cuda.get_device_name(0)}")
+print(f"VRAM: {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB")
+
+# Cell 3: Train (LoRA on T4 — recommended for 16GB VRAM)
+!python -m gsr_cacl.train \
+    --dataset finqa \
+    --stage all \
+    --epochs 5 \
+    --preset t4 \
+    --gradient-checkpointing \
+    --save /kaggle/working/outputs
+
+# Cell 4: Benchmark
+!python -m gsr_cacl.benchmark_gsr --mode gsr --dataset finqa --top-k 3
+```
+
+### Option B: Google Colab (T4 free / A100 Pro)
+
+```python
+# Cell 1: Clone & Install
+!git clone https://github.com/<YOUR_REPO>/gsr-cacl.git /content/gsr-cacl
+%cd /content/gsr-cacl/ours/source
+!pip install -e ".[gpu]" --quiet
+!pip install peft accelerate transformers --quiet
+
+# Cell 2: Train
+# For free T4 (16GB VRAM):
+!python -m gsr_cacl.train --dataset finqa --stage all --preset t4 --gradient-checkpointing
+
+# For Colab Pro A100 (40GB VRAM):
+!python -m gsr_cacl.train --dataset finqa --stage all --preset a100
+
+# Cell 3: Benchmark
+!python -m gsr_cacl.benchmark_gsr --mode gsr --dataset finqa --top-k 3
+```
+
+### Hardware Presets
+
+| Preset | Encoder | Fine-tune | Batch | VRAM | Trainable Params |
+|--------|---------|-----------|-------|------|-----------------|
+| `t4`   | bge-large (335M) | LoRA r=16 | 8 | ~12 GB | ~5.4M |
+| `a100` | bge-large (335M) | Full | 16 | ~20 GB | ~336M |
+| `v100` | bge-base (110M)  | Full | 16 | ~14 GB | ~111M |
+| `cpu`  | bge-base (110M)  | Frozen | 4 | — | ~1.3M |
+
+### VRAM Estimation
+
+| Config | Model | Fine-tune | Batch=8 | Batch=16 |
+|--------|-------|-----------|---------|----------|
+| bge-base + LoRA | 110M | LoRA r=16 | ~6 GB | ~8 GB |
+| bge-large + LoRA | 335M | LoRA r=16 | ~10 GB | ~14 GB |
+| bge-large + Full | 335M | Full | ~14 GB | ~20 GB |
+| e5-large + LoRA | 560M | LoRA r=16 | ~14 GB | ~20 GB |
+
+> **Tip:** Add `--gradient-checkpointing` to halve activation memory at ~20% speed cost.
+
+---
+
+## Local Installation
 
 ```bash
-# Using conda environment "master"
+# Using conda
 conda activate master
 
 # Install package
 cd /project/ours/source
 pip install -e ".[dev]"
 
-# Verify installation
+# For GPU support
+pip install -e ".[gpu]"
+
+# For LoRA fine-tuning
+pip install peft accelerate transformers
+
+# Verify
 python -c "import gsr_cacl; print(gsr_cacl.__version__)"
 ```
 
@@ -37,17 +114,44 @@ python -c "import gsr_cacl; print(gsr_cacl.__version__)"
 
 ```
 torch>=2.0.0
+transformers>=4.36.0, peft>=0.7.0, accelerate>=0.25.0
 langchain-core, langchain-huggingface, langchain-community
-rank-bm25, faiss-cpu
-datasets, pandas, tqdm
-hydra-core, omegaconf
+rank-bm25, faiss-cpu (or faiss-gpu)
+datasets, pandas, tqdm, hydra-core, omegaconf
 ```
 
 ---
 
 ## Quick Start
 
-### 1. Run GSR Retrieval Benchmark
+### 1. Train GSR + CACL (end-to-end)
+
+```bash
+# Recommended: LoRA fine-tuning with bge-large (fits T4 16GB)
+python -m gsr_cacl.train \
+    --dataset finqa \
+    --stage all \
+    --encoder BAAI/bge-large-en-v1.5 \
+    --finetune lora \
+    --epochs 5 \
+    --batch-size 8
+
+# Full fine-tuning on A100 (maximum benchmark performance)
+python -m gsr_cacl.train \
+    --dataset finqa \
+    --stage all \
+    --encoder BAAI/bge-large-en-v1.5 \
+    --finetune full \
+    --epochs 5 \
+    --batch-size 16
+
+# Stage-by-stage training
+python -m gsr_cacl.train --dataset finqa --stage identity --epochs 3
+python -m gsr_cacl.train --dataset finqa --stage structural --epochs 3
+python -m gsr_cacl.train --dataset finqa --stage joint --epochs 5
+```
+
+### 2. Run GSR Retrieval Benchmark
 
 ```bash
 # On FinQA
@@ -60,23 +164,10 @@ python -m gsr_cacl.benchmark_gsr --mode gsr --dataset tatqa --top-k 3
 python -m gsr_cacl.benchmark_gsr --mode hybridgsr --dataset finqa --top-k 3
 ```
 
-### 2. Compare with Baselines
+### 3. Compare with Baselines
 
 ```bash
 python -m gsr_cacl.evaluate_comparison --dataset finqa --methods gsr hybridgsr --save results.csv
-```
-
-### 3. Train GSR + CACL
-
-```bash
-# Stage 1: Identity pretraining
-python -m gsr_cacl.train --dataset finqa --stage identity --epochs 3
-
-# Stage 2: Structural pretraining
-python -m gsr_cacl.train --dataset finqa --stage structural --epochs 3
-
-# Stage 3: Joint finetuning (CACL)
-python -m gsr_cacl.train --dataset finqa --stage joint --epochs 5 --batch-size 16
 ```
 
 ---
@@ -143,6 +234,15 @@ Three types, all satisfying Zero-Sum property:
 
 ---
 
+## Trainable Parameters Summary
+
+| Component | Params | Frozen mode | LoRA mode | Full mode |
+|-----------|--------|-------------|-----------|-----------|
+| **TextEncoder** (bge-large) | 335M | Frozen | ~4.2M trainable | 335M trainable |
+| **GATEncoder** | 1.22M | Trainable | Trainable | Trainable |
+| **JointScorer** | 66.8K | Trainable | Trainable | Trainable |
+| **Total trainable** | — | **1.29M** | **~5.5M** | **~336M** |
+
 ## Computational Cost
 
 | Component | Complexity | Notes |
@@ -150,6 +250,7 @@ Three types, all satisfying Zero-Sum property:
 | KG Construction | O(n_cells) | ~57 cells avg (TAT-DQA), regex-based |
 | GAT Encoding | O(V·E) | V≈57, E≈5-10, sparse attention |
 | Constraint Scoring | O(E_c) | E_c≈5-10, constant time |
+| Text Encoding (forward) | O(seq_len²·d) | Standard transformer, max_len=512 |
 | **Total inference** | **~1.2–1.4× baseline** | Pre-indexed KG construction |
 | CHAP Generation | O(n_cells) | Offline pre-generation, zero runtime cost |
 

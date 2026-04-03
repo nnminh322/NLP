@@ -22,6 +22,7 @@ from gsr_cacl.kg.data_structures import ConstraintKG
 from gsr_cacl.encoders.gat_encoder import GATEncoder
 from gsr_cacl.scoring.constraint_score import compute_constraint_score
 from gsr_cacl.scoring.joint_scorer import JointScorer
+from gsr_cacl.datasets.gsr_document import extract_table
 
 
 class GSRRetrieval:
@@ -50,6 +51,7 @@ class GSRRetrieval:
         gat_num_heads: int = 4,
         gat_num_layers: int = 2,
         device: str | None = None,
+        checkpoint_path: str | None = None,
     ):
         self.corpus = corpus
         self.embedding_function = embedding_function
@@ -76,17 +78,34 @@ class GSRRetrieval:
             num_heads=gat_num_heads,
             num_layers=gat_num_layers,
         ).to(self.device)
-        self.gat_encoder.eval()
-
-        # Pre-encode KGs
-        self._encode_all_kgs()
 
         # Joint scorer (§4.4)
         self.scorer = JointScorer(
             text_embed_dim=768,
             kg_embed_dim=gat_hidden_dim,
         ).to(self.device)
+
+        # Load pre-trained weights if available
+        if checkpoint_path is not None:
+            self._load_checkpoint(checkpoint_path)
+
+        self.gat_encoder.eval()
         self.scorer.eval()
+
+        # Pre-encode KGs
+        self._encode_all_kgs()
+
+    def _load_checkpoint(self, path: str) -> None:
+        """Load pre-trained scorer and GAT encoder weights."""
+        import logging
+        logger = logging.getLogger(__name__)
+        ckpt = torch.load(path, map_location=self.device, weights_only=True)
+        if "scorer_state" in ckpt:
+            self.scorer.load_state_dict(ckpt["scorer_state"])
+            logger.info(f"Loaded scorer weights from {path}")
+        if "gat_encoder_state" in ckpt:
+            self.gat_encoder.load_state_dict(ckpt["gat_encoder_state"])
+            logger.info(f"Loaded GAT encoder weights from {path}")
 
     # ------------------------------------------------------------------
     # Indexing
@@ -137,13 +156,7 @@ class GSRRetrieval:
         self.kg_embeds: list[torch.Tensor] = []
         for kg in tqdm(self.doc_kgs, desc="Encoding KGs with GAT"):
             with torch.no_grad():
-                node_embeds = self.gat_encoder(kg)
-                if node_embeds.numel() > 0:
-                    doc_embed = node_embeds.mean(dim=0)
-                else:
-                    doc_embed = torch.zeros(
-                        self.gat_encoder.output_dim, device=self.device
-                    )
+                doc_embed = self.gat_encoder.encode_graph(kg)
                 self.kg_embeds.append(doc_embed)
 
     # ------------------------------------------------------------------
@@ -154,7 +167,8 @@ class GSRRetrieval:
         """
         Retrieve top-K documents for a query using joint scoring.
 
-        Joint Score = α·sim_text(Q,D) + β·sim_entity(Q,D) + γ·CS(G_D)
+        Joint Score = α·sim_text(Q,D,KG) + β·sim_entity(Q,D) + γ·CS(G_D)
+        Uses JointScorer with KG embeddings from GAT encoder.
         """
         # FAISS first-stage retrieval → candidate LangChain Documents
         candidates = self.vector_store.similarity_search(query, k=self.top_k * 4)
@@ -170,33 +184,31 @@ class GSRRetrieval:
             if corpus_idx is None:
                 continue
 
-            # Text similarity
             doc_tensor = torch.tensor(
                 self.doc_text_embeds[corpus_idx], dtype=torch.float32, device=self.device
             )
-            text_sim = float(
-                torch.cosine_similarity(
-                    q_tensor.unsqueeze(0), doc_tensor.unsqueeze(0)
-                ).item()
-            )
 
-            # Constraint score (§4.4)
+            # KG embedding from pre-computed GAT encoder output
+            kg_embed = self.kg_embeds[corpus_idx]
+
+            # Constraint score
             cs_result = compute_constraint_score(
                 self.doc_kgs[corpus_idx], epsilon=self.epsilon
             )
-            constraint_score = (
-                cs_result.constraint_score if cs_result.total_count > 0 else 1.0
-            )
 
-            # Entity matching score (§4.4)
+            # Entity matching score
             entity_score = self._compute_entity_score(query_meta, corpus_idx)
 
-            # Joint score
-            final_score = (
-                self.alpha * text_sim
-                + self.beta * entity_score
-                + self.gamma * constraint_score
-            )
+            # Use JointScorer for final score (integrates text + KG + entity + constraint)
+            with torch.no_grad():
+                final_score = self.scorer.score_single(
+                    query_text_embed=q_tensor,
+                    doc_text_embed=doc_tensor,
+                    kg_embed=kg_embed,
+                    entity_score=entity_score,
+                    constraint_result=cs_result,
+                )
+
             scores.append((corpus_idx, final_score))
 
         ranked = sorted(scores, key=lambda x: x[1], reverse=True)[: self.top_k]
@@ -205,7 +217,7 @@ class GSRRetrieval:
     def retrieve_batch(
         self,
         queries: list[str],
-        queries_meta: list[dict[str, Any]] | None = None,
+        queries_meta: list[dict[str, Any] | None] | None = None,
     ) -> list[list[Document]]:
         """Retrieve for a batch of queries."""
         if queries_meta is None:
@@ -248,17 +260,7 @@ class GSRRetrieval:
     @staticmethod
     def _extract_table(content: str) -> str:
         """Extract the first markdown table from page content."""
-        lines = content.split("\n")
-        in_table = False
-        table_lines = []
-        for line in lines:
-            stripped = line.strip()
-            if "|" in stripped:
-                in_table = True
-                table_lines.append(stripped)
-            elif in_table:
-                break
-        return "\n".join(table_lines) if len(table_lines) >= 2 else ""
+        return extract_table(content)
 
 
 class HybridGSR(GSRRetrieval):

@@ -30,4 +30,7 @@ class SinusoidalPositionalEncoding(nn.Module):
         Returns:
             positional embeddings [batch_size, seq_len, d_model]
         """
-        return self.pe[:, indices, :]
+        # Clamp indices to valid range
+        indices = indices.clamp(0, self.pe.size(1) - 1)
+        # Gather embeddings: pe is [1, max_len, d_model]
+        return self.pe[0, indices]  # [batch_size, seq_len, d_model] or [seq_len, d_model]
