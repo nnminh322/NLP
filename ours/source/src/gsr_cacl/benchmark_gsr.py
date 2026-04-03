@@ -5,15 +5,17 @@ GSR-CACL Retrieval Benchmark.
 Runs GSR and HybridGSR on T²-RAGBench (§5 of overall_idea.md).
 Evaluation metrics: MRR@3, Recall@1/3/5, NDCG@3.
 
-Usage:
-    python -m gsr_cacl.benchmark_gsr --mode gsr --dataset finqa
-    python -m gsr_cacl.benchmark_gsr --mode hybridgsr --dataset tatqa
-    python -m gsr_cacl.benchmark_gsr --mode gsr --dataset convfinqa
+Usage (Hydra):
+    python -m gsr_cacl.benchmark_gsr dataset=gsr_finqa mode=gsr
+    python -m gsr_cacl.benchmark_gsr dataset=gsr_tatqa mode=hybridgsr
+    python -m gsr_cacl.benchmark_gsr dataset=gsr_finqa mode=gsr eval.sample_size=10
+
+Legacy CLI (without Hydra):
+    python -m gsr_cacl.benchmark_gsr --mode gsr --dataset finqa --sample 10
 """
 
 from __future__ import annotations
 
-import argparse
 import json
 import logging
 import math
@@ -40,39 +42,22 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Dataset configs
+# Fallback dataset configs (used when Hydra configs are not available)
 # ---------------------------------------------------------------------------
 
 DATASET_CONFIGS: dict[str, dict] = {
-    "finqa": {"config_name": "FinQA", "split": "FinQA"},
-    "convfinqa": {"config_name": "ConvFinQA", "split": "ConvFinQA"},
-    "tatqa": {"config_name": "TAT-DQA", "split": "TAT-DQA"},
+    "finqa": {"config_name": "FinQA", "eval_split": "test", "train_split": "train"},
+    "convfinqa": {"config_name": "ConvFinQA", "eval_split": "turn_0", "train_split": "turn_0"},
+    "tatqa": {"config_name": "TAT-DQA", "eval_split": "test", "train_split": "train"},
 }
 
 # ---------------------------------------------------------------------------
-# Method configs (GSR §4 hyperparameters)
+# Method registry
 # ---------------------------------------------------------------------------
 
-METHOD_CONFIGS: dict[str, dict] = {
-    "gsr": {
-        "class": GSRRetrieval,
-        "alpha": 0.5,
-        "beta": 0.3,
-        "gamma": 0.2,
-        "gat_hidden_dim": 256,
-        "gat_num_heads": 4,
-        "gat_num_layers": 2,
-    },
-    "hybridgsr": {
-        "class": HybridGSR,
-        "alpha": 0.4,
-        "beta": 0.3,
-        "gamma": 0.2,
-        "gat_hidden_dim": 256,
-        "gat_num_heads": 4,
-        "gat_num_layers": 2,
-        "rrf_k": 60,
-    },
+METHOD_REGISTRY: dict[str, type] = {
+    "gsr": GSRRetrieval,
+    "hybridgsr": HybridGSR,
 }
 
 
@@ -118,7 +103,9 @@ def compute_ndcg(results: list[RetrievalResult], k: int = 3) -> float:
 
 def run_gsr_benchmark(
     mode: str,
-    dataset: str,
+    config_name: str,
+    eval_split: str,
+    gsr_params: dict | None = None,
     embedding_model: str = "intfloat/multilingual-e5-large-instruct",
     top_k: int = 3,
     device: str | None = None,
@@ -128,24 +115,35 @@ def run_gsr_benchmark(
     """
     Run GSR retrieval benchmark on a T²-RAGBench subset.
 
-    Returns dict of metric results.
+    Args:
+        mode: "gsr" or "hybridgsr"
+        config_name: HuggingFace config name, e.g. "FinQA"
+        eval_split: HuggingFace split name, e.g. "test"
+        gsr_params: GSR hyperparameters (alpha, beta, gamma, etc.)
+        embedding_model: HuggingFace embedding model name
+        top_k: number of documents to retrieve
+        device: "cuda" or "cpu" (auto-detected if None)
+        output_dir: where to save metrics JSON
+        sample_size: limit QA samples for debugging
+
+    Returns:
+        dict of metric results
     """
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.info(f"Device: {device}")
 
-    # Resolve configs
-    ds_cfg = DATASET_CONFIGS.get(dataset)
-    if ds_cfg is None:
-        raise ValueError(f"Unknown dataset: {dataset}. Choose from {list(DATASET_CONFIGS)}")
-    method_cfg = dict(METHOD_CONFIGS.get(mode, {}))
-    if not method_cfg:
-        raise ValueError(f"Unknown mode: {mode}. Choose from {list(METHOD_CONFIGS)}")
+    if gsr_params is None:
+        gsr_params = {}
+
+    RAGClass = METHOD_REGISTRY.get(mode)
+    if RAGClass is None:
+        raise ValueError(f"Unknown mode: {mode}. Choose from {list(METHOD_REGISTRY)}")
 
     # Load dataset
     split_data = load_t2ragbench_split(
-        config_name=ds_cfg["config_name"],
-        split=ds_cfg["split"],
+        config_name=config_name,
+        split=eval_split,
         sample_size=sample_size,
     )
     logger.info(f"Queries: {len(split_data.queries)}, Corpus: {len(split_data.corpus)}")
@@ -164,14 +162,18 @@ def run_gsr_benchmark(
         model_kwargs={"device": device},
     )
 
-    # Build retrieval method
-    RAGClass = method_cfg.pop("class")
+    # Build retrieval method with GSR hyperparameters from config
     rag_method = RAGClass(
         corpus=split_data.corpus,
         embedding_function=embeddings,
         top_k=top_k,
         device=device,
-        **method_cfg,
+        alpha=gsr_params.get("alpha", 0.5),
+        beta=gsr_params.get("beta", 0.3),
+        gamma=gsr_params.get("gamma", 0.2),
+        gat_hidden_dim=gsr_params.get("gat_hidden_dim", 256),
+        gat_num_heads=gsr_params.get("gat_num_heads", 4),
+        gat_num_layers=gsr_params.get("gat_num_layers", 2),
     )
 
     # Run retrieval
@@ -201,8 +203,9 @@ def run_gsr_benchmark(
     }
 
     # Print results
+    dataset_label = config_name
     print("\n" + "=" * 60)
-    print(f"GSR-CACL BENCHMARK  [{mode.upper()} on {dataset.upper()}]")
+    print(f"GSR-CACL BENCHMARK  [{mode.upper()} on {dataset_label}]")
     print("=" * 60)
     for name, val in metrics.items():
         print(f"  {name:>12}: {val:.4f}")
@@ -211,7 +214,7 @@ def run_gsr_benchmark(
     # Save outputs
     if output_dir is None:
         ts = datetime.now().strftime("%y%m%d_%H%M%S")
-        output_dir = Path(f"outputs/gsr_benchmark/{dataset}/{mode}_{ts}")
+        output_dir = Path(f"outputs/gsr_benchmark/{config_name}/{mode}_{ts}")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     with open(output_dir / "metrics.json", "w") as f:
@@ -222,10 +225,50 @@ def run_gsr_benchmark(
 
 
 # ---------------------------------------------------------------------------
-# CLI
+# Hydra entry point
 # ---------------------------------------------------------------------------
 
 def main() -> None:
+    """Entry point: supports both Hydra and legacy argparse CLI."""
+    # Detect Hydra mode: if sys.argv has '=' overrides or no '--' flags
+    use_hydra = any("=" in a and not a.startswith("--") for a in sys.argv[1:]) or len(sys.argv) == 1
+
+    if use_hydra:
+        _main_hydra()
+    else:
+        _main_argparse()
+
+
+def _main_hydra() -> None:
+    """Hydra-based entry point using conf/ YAML files."""
+    import hydra
+    from omegaconf import DictConfig, OmegaConf
+
+    @hydra.main(config_path="../../../conf", config_name="config", version_base="1.3")
+    def _run(cfg: DictConfig) -> None:
+        ds = cfg.dataset
+        gsr_params = OmegaConf.to_container(ds.get("gsr", {}), resolve=True)
+        embedding_model = gsr_params.pop("embedding_model", None) or \
+            cfg.get("model", {}).get("embedding", {}).get("name", "intfloat/multilingual-e5-large-instruct")
+
+        run_gsr_benchmark(
+            mode=cfg.mode,
+            config_name=ds.config_name,
+            eval_split=ds.eval_split,
+            gsr_params=gsr_params,
+            embedding_model=embedding_model,
+            top_k=gsr_params.pop("top_k", cfg.get("eval", {}).get("top_k", 3)),
+            device=None,
+            sample_size=cfg.get("eval", {}).get("sample_size"),
+        )
+
+    _run()
+
+
+def _main_argparse() -> None:
+    """Legacy argparse-based entry point."""
+    import argparse
+
     parser = argparse.ArgumentParser(
         description="GSR-CACL Retrieval Benchmark on T²-RAGBench",
     )
@@ -241,11 +284,16 @@ def main() -> None:
                         help="Limit number of QA samples (for debugging)")
     args = parser.parse_args()
 
+    ds_cfg = DATASET_CONFIGS.get(args.dataset)
+    if ds_cfg is None:
+        raise ValueError(f"Unknown dataset: {args.dataset}")
+
     output_dir = Path(args.output_dir) if args.output_dir else None
     try:
         run_gsr_benchmark(
             mode=args.mode,
-            dataset=args.dataset,
+            config_name=ds_cfg["config_name"],
+            eval_split=ds_cfg["eval_split"],
             embedding_model=args.embedding,
             top_k=args.top_k,
             device=args.device,

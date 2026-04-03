@@ -1,0 +1,29 @@
+# Hydra defaults configuration for GSR-CACL
+defaults:
+  - dataset: gsr_finqa
+  - model: gsr_default
+  - _self_
+
+# Retrieval mode
+mode: "gsr"               # "gsr" | "hybridgsr"
+
+# Evaluation
+eval:
+  top_k: 3
+  sample_size: null        # null = use full dataset; int = subsample for debugging
+
+# Training
+training:
+  stage: "joint"           # "identity" | "structural" | "joint"
+  epochs: 5
+  batch_size: 16
+  lr: 5.0e-5
+  margin: 0.2
+  lambda_constraint: 0.5
+
+# HybridGSR-specific
+hybrid:
+  rrf_k: 60
+
+# Output
+output_dir: "outputs/"

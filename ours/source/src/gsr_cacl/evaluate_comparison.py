@@ -17,7 +17,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from gsr_cacl.benchmark_gsr import run_gsr_benchmark
+from gsr_cacl.benchmark_gsr import run_gsr_benchmark, DATASET_CONFIGS
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -51,9 +51,15 @@ def run_comparison(
 
     for method in methods:
         logger.info(f"Running {method} on {dataset}")
+        ds_cfg = DATASET_CONFIGS.get(dataset)
+        if ds_cfg is None:
+            logger.error(f"Unknown dataset: {dataset}")
+            continue
         try:
             results = run_gsr_benchmark(
-                mode=method, dataset=dataset,
+                mode=method,
+                config_name=ds_cfg["config_name"],
+                eval_split=ds_cfg["eval_split"],
                 embedding_model=embedding, top_k=top_k,
             )
             rows.append({

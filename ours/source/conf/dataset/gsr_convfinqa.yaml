@@ -1,7 +1,7 @@
 name: "G4KMU/t2-ragbench"
-config_name: "TAT-DQA"
-eval_split: "test"
-train_split: "train"
+config_name: "ConvFinQA"
+eval_split: "turn_0"     # ConvFinQA only has turn_0 split
+train_split: "turn_0"
 language: "en"
 meta_data_keys:
   - report_year

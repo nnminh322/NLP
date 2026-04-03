@@ -112,6 +112,11 @@ class GSRRetrieval:
             else:
                 self.vector_store.add_documents(batch)
 
+        # Corpus id → index mapping for KG/embed lookup
+        self._id_to_idx: dict[str, int] = {
+            str(doc.id): i for i, doc in enumerate(self.corpus)
+        }
+
         # Store text embeddings for scoring
         all_text_embeds = []
         for doc in tqdm(self.corpus, desc="Computing text embeddings"):
@@ -151,21 +156,23 @@ class GSRRetrieval:
 
         Joint Score = α·sim_text(Q,D) + β·sim_entity(Q,D) + γ·CS(G_D)
         """
-        # FAISS first-stage retrieval
+        # FAISS first-stage retrieval → candidate LangChain Documents
         candidates = self.vector_store.similarity_search(query, k=self.top_k * 4)
-        n_candidates = min(len(candidates), self.top_k * 4)
 
         q_text_emb = np.array(self.embedding_function.embed_query(query))
         q_tensor = torch.tensor(q_text_emb, dtype=torch.float32, device=self.device)
 
-        scores: dict[int, float] = {}
-        for idx in range(n_candidates):
-            if idx >= len(self.doc_text_embeds):
+        scores: list[tuple[int, float]] = []
+        for cand in candidates:
+            # Map FAISS candidate back to corpus index
+            cand_id = cand.metadata.get("id", "")
+            corpus_idx = self._id_to_idx.get(cand_id)
+            if corpus_idx is None:
                 continue
 
             # Text similarity
             doc_tensor = torch.tensor(
-                self.doc_text_embeds[idx], dtype=torch.float32, device=self.device
+                self.doc_text_embeds[corpus_idx], dtype=torch.float32, device=self.device
             )
             text_sim = float(
                 torch.cosine_similarity(
@@ -175,14 +182,14 @@ class GSRRetrieval:
 
             # Constraint score (§4.4)
             cs_result = compute_constraint_score(
-                self.doc_kgs[idx], epsilon=self.epsilon
+                self.doc_kgs[corpus_idx], epsilon=self.epsilon
             )
             constraint_score = (
                 cs_result.constraint_score if cs_result.total_count > 0 else 1.0
             )
 
             # Entity matching score (§4.4)
-            entity_score = self._compute_entity_score(query_meta, idx)
+            entity_score = self._compute_entity_score(query_meta, corpus_idx)
 
             # Joint score
             final_score = (
@@ -190,9 +197,9 @@ class GSRRetrieval:
                 + self.beta * entity_score
                 + self.gamma * constraint_score
             )
-            scores[idx] = final_score
+            scores.append((corpus_idx, final_score))
 
-        ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)[: self.top_k]
+        ranked = sorted(scores, key=lambda x: x[1], reverse=True)[: self.top_k]
         return [self.corpus[idx] for idx, _ in ranked]
 
     def retrieve_batch(

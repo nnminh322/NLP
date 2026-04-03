@@ -17,4 +17,4 @@ Contributions:
 """
 
 __version__ = "1.0.0"
-__author__ = "natmiin322"
+__author__ = "natmin322"

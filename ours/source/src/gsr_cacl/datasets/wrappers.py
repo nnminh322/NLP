@@ -26,14 +26,19 @@ logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------
 
 def _row_to_document(row: dict[str, Any]) -> Document:
-    """Convert a single HuggingFace dataset row to a Document."""
+    """Convert a single HuggingFace dataset row to a corpus Document.
+
+    Uses ``context_id`` as the document ID so that multiple QA pairs
+    sharing the same context map to a single corpus document.
+    """
     page_content = str(row.get("context", "") or "")
     meta = {
         "company_name": str(row.get("company_name", "")),
         "report_year": str(row.get("report_year", "")),
         "company_sector": str(row.get("company_sector", "")),
     }
-    doc_id = str(row.get("id", row.get("_id", "")))
+    # Use context_id (unique per document) — NOT id (unique per QA pair)
+    doc_id = str(row.get("context_id", row.get("id", "")))
     if not doc_id:
         import uuid
         doc_id = str(uuid.uuid4())
@@ -41,7 +46,11 @@ def _row_to_document(row: dict[str, Any]) -> Document:
 
 
 def _build_corpus(df: pd.DataFrame) -> list[Document]:
-    """Build a de-duplicated corpus of Documents from a DataFrame."""
+    """Build a de-duplicated corpus of Documents from a DataFrame.
+
+    Deduplicates by ``context_id`` so each unique financial document
+    appears once in the corpus.
+    """
     seen_ids: set[str] = set()
     corpus: list[Document] = []
     for _, row in df.iterrows():
@@ -53,7 +62,10 @@ def _build_corpus(df: pd.DataFrame) -> list[Document]:
 
 
 def _build_queries(df: pd.DataFrame) -> tuple[list[str], list[str], list[dict]]:
-    """Extract queries, ground-truth IDs, and per-query metadata."""
+    """Extract queries, ground-truth context IDs, and per-query metadata.
+
+    Ground truth IDs use ``context_id`` to match corpus documents.
+    """
     queries: list[str] = []
     gt_ids: list[str] = []
     metas: list[dict] = []
@@ -63,12 +75,12 @@ def _build_queries(df: pd.DataFrame) -> tuple[list[str], list[str], list[dict]]:
         if company:
             q = f"{company}: {q}"
         queries.append(q)
-        gt_ids.append(str(row.get("id", row.get("_id", ""))))
+        # Ground truth = context_id (matches corpus Document.id)
+        gt_ids.append(str(row.get("context_id", row.get("id", ""))))
         metas.append({
             "company_name": str(row.get("company_name", "")),
             "report_year": str(row.get("report_year", "")),
             "company_sector": str(row.get("company_sector", "")),
-            "reference_document": {"id": str(row.get("id", row.get("_id", "")))},
         })
     return queries, gt_ids, metas
 

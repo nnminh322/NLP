@@ -38,9 +38,9 @@ logger = logging.getLogger(__name__)
 
 # Dataset configs (mirrors benchmark_gsr.py)
 DATASET_CONFIGS = {
-    "finqa": {"config_name": "FinQA", "split": "FinQA"},
-    "convfinqa": {"config_name": "ConvFinQA", "split": "ConvFinQA"},
-    "tatqa": {"config_name": "TAT-DQA", "split": "TAT-DQA"},
+    "finqa": {"config_name": "FinQA", "train_split": "train", "eval_split": "test"},
+    "convfinqa": {"config_name": "ConvFinQA", "train_split": "turn_0", "eval_split": "turn_0"},
+    "tatqa": {"config_name": "TAT-DQA", "train_split": "train", "eval_split": "test"},
 }
 
 
@@ -54,11 +54,12 @@ def load_training_data(dataset: str, split: str = "train") -> list[RetrievalSamp
     if ds_cfg is None:
         raise ValueError(f"Unknown dataset: {dataset}")
 
-    logger.info(f"Loading {split} split for {dataset}...")
+    hf_split = ds_cfg["train_split"] if split == "train" else ds_cfg["eval_split"]
+    logger.info(f"Loading {hf_split} split for {dataset}...")
     df = load_dataset(
         "G4KMU/t2-ragbench",
         ds_cfg["config_name"],
-        split=ds_cfg["split"],
+        split=hf_split,
     ).to_pandas()
 
     samples = []

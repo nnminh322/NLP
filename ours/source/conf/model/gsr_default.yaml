@@ -1,0 +1,21 @@
+# Embedding model configuration
+embedding:
+  name: "intfloat/multilingual-e5-large-instruct"
+  dim: 768
+  device: "auto"          # "auto" | "cuda" | "cpu"
+  batch_size: 32
+  normalize: true
+
+# GAT encoder (§4.3)
+gat:
+  hidden_dim: 256
+  num_heads: 4
+  num_layers: 2
+  dropout: 0.1
+
+# Joint scorer (§4.4)
+scorer:
+  text_embed_dim: 768     # must match embedding.dim
+  kg_embed_dim: 256       # must match gat.hidden_dim
+  entity_feat_dim: 3      # company, year, sector
+  hidden_dim: 64
