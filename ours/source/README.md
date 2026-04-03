@@ -178,6 +178,7 @@ lexical/dense methods miss.
 ours/source/
 ├── pyproject.toml
 ├── README.md
+├── Makefile
 ├── conf/
 │   └── dataset/
 │       ├── gsr_finqa.yaml
@@ -185,27 +186,56 @@ ours/source/
 └── src/
     └── gsr_cacl/
         ├── __init__.py
-        ├── benchmark_gsr.py     ← Main benchmark entry point
-        ├── evaluate.py          ← CLI entry
-        ├── evaluate_comparison.py ← Baseline comparison
-        ├── train.py             ← Joint training script
+        ├── benchmark_gsr.py          ← Main benchmark entry point
+        ├── evaluate.py               ← CLI entry
+        ├── evaluate_comparison.py     ← Baseline comparison
+        ├── train.py                   ← Joint training script
+        ├── template_coverage_analysis.py
         │
-        ├── templates/           ← IFRS/GAAP template library
-        │   └── __init__.py
-        ├── kg/                  ← KG construction
-        │   └── __init__.py
-        ├── encoders/           ← GAT encoder
-        │   └── __init__.py
-        ├── scoring/            ← Constraint-aware scoring
-        │   └── __init__.py
-        ├── negative_sampler/   ← CHAP negative generation
-        │   └── __init__.py
-        ├── training/            ← CACL training
-        │   └── __init__.py
-        ├── methods/            ← GSR RAG methods
-        │   └── __init__.py
-        └── datasets/            ← GSR-enriched dataset wrappers
-            └── __init__.py
+        ├── core/                      ← Core data structures
+        │   └── __init__.py            Document, RetrievalResult, DatasetSplit
+        │
+        ├── templates/                 ← IFRS/GAAP template library
+        │   ├── __init__.py            (re-exports)
+        │   ├── data_structures.py     AccountingConstraint, AccountingTemplate
+        │   ├── library.py             15 templates + TEMPLATE_REGISTRY
+        │   └── matching.py            match_template(), normalize_header()
+        │
+        ├── kg/                        ← Constraint KG construction
+        │   ├── __init__.py            (re-exports)
+        │   ├── data_structures.py     KGNode, KGEdge, ConstraintKG
+        │   ├── parser.py              parse_markdown_rows(), parse_number()
+        │   └── builder.py             build_constraint_kg(), build_kg_from_markdown()
+        │
+        ├── encoders/                  ← GAT graph encoder
+        │   ├── __init__.py            (re-exports)
+        │   ├── positional.py          SinusoidalPositionalEncoding
+        │   ├── gat_layer.py           GATLayer (edge-aware attention)
+        │   └── gat_encoder.py         GATEncoder (2-layer, 4-head)
+        │
+        ├── scoring/                   ← Constraint-aware scoring
+        │   ├── __init__.py            (re-exports)
+        │   ├── constraint_score.py    compute_constraint_score(), compute_entity_score()
+        │   └── joint_scorer.py        JointScorer (learnable α, β, γ)
+        │
+        ├── negative_sampler/          ← CHAP negative generation
+        │   ├── __init__.py            (re-exports)
+        │   └── chap.py               CHAPNegativeSampler, apply_chap_{a,s,e}
+        │
+        ├── training/                  ← CACL training loop
+        │   ├── __init__.py            (re-exports)
+        │   ├── losses.py              TripletLoss, ConstraintViolationLoss, CACLLoss
+        │   ├── data.py                RetrievalSample, RetrievalDataset
+        │   └── trainer.py             train_gsr_cacl()
+        │
+        ├── methods/                   ← GSR RAG methods
+        │   ├── __init__.py            (re-exports)
+        │   └── gsr_retrieval.py       GSRRetrieval, HybridGSR
+        │
+        └── datasets/                  ← Dataset loading (HuggingFace)
+            ├── __init__.py            (re-exports)
+            ├── gsr_document.py        GSRDocument, extract_table()
+            └── wrappers.py            load_t2ragbench_split(), build_gsr_corpus()
 ```
 
 ---

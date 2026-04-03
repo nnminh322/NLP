@@ -2,99 +2,58 @@
 """
 GSR-CACL Retrieval Benchmark.
 
-Runs GSR and HybridGSR on T²-RAGBench using the same evaluation
-framework as g4k's benchmark_retrieval.py, enabling direct comparison
-with all baseline methods.
+Runs GSR and HybridGSR on T²-RAGBench (§5 of overall_idea.md).
+Evaluation metrics: MRR@3, Recall@1/3/5, NDCG@3.
 
 Usage:
     python -m gsr_cacl.benchmark_gsr --mode gsr --dataset finqa
     python -m gsr_cacl.benchmark_gsr --mode hybridgsr --dataset tatqa
     python -m gsr_cacl.benchmark_gsr --mode gsr --dataset convfinqa
-
-Evaluation metrics: MRR@3, Recall@1/3/5, NDCG@3 (same as baseline).
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import logging
+import math
 import sys
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 import torch
 from tqdm import tqdm
-import pandas as pd
-from datasets import load_dataset, DatasetDict
 
-from g4k.internal.abstractions import BatchInferenceRunner, SamplingParams
-from gsr_cacl.methods import GSRRetrieval, HybridGSR
-from gsr_cacl.datasets import GSRFinQADataset, GSRTatQADataset
+from gsr_cacl.core import Document, RetrievalResult, DatasetSplit
+from gsr_cacl.datasets.wrappers import (
+    load_t2ragbench_split,
+    build_gsr_corpus,
+    get_template_coverage_stats,
+)
+from gsr_cacl.methods import GSRRetrieval, HybridGSR, GSR_REGISTRY
 
-
-# ---------------------------------------------------------------------------
-# Logging
-# ---------------------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
 
+
 # ---------------------------------------------------------------------------
-# Dataset configs (mirrors g4k conf/dataset/)
+# Dataset configs
 # ---------------------------------------------------------------------------
 
-DATASET_CONFIGS = {
-    "finqa": {
-        "name": "G4KMU/t2-ragbench",
-        "config_name": "FinQA",
-        "split": "FinQA",
-        "meta_data_keys": ["report_year", "company_name", "company_sector"],
-        "retrieval_query": (
-            "Given a question about a company, retrieve relevant passages "
-            "that answer the query."
-        ),
-        "dataset_wrapper": GSRFinQADataset,
-    },
-    "convfinqa": {
-        "name": "G4KMU/t2-ragbench",
-        "config_name": "ConvFinQA",
-        "split": "ConvFinQA",
-        "meta_data_keys": ["report_year", "company_name", "company_sector"],
-        "retrieval_query": (
-            "Given a multi-turn financial question, retrieve relevant passages."
-        ),
-        "dataset_wrapper": GSRFinQADataset,
-    },
-    "tatqa": {
-        "name": "G4KMU/t2-ragbench",
-        "config_name": "TAT-DQA",
-        "split": "TAT-DQA",
-        "meta_data_keys": ["report_year", "company_name", "company_sector"],
-        "retrieval_query": (
-            "Given a question about tabular financial data, "
-            "retrieve the correct table context."
-        ),
-        "dataset_wrapper": GSRTatQADataset,
-    },
-    "all": {
-        "name": "G4KMU/t2-ragbench",
-        "config_name": None,   # load all
-        "split": "train+validation+test",
-        "meta_data_keys": ["report_year", "company_name", "company_sector"],
-        "retrieval_query": (
-            "Given a financial question, retrieve relevant text+table passages."
-        ),
-        "dataset_wrapper": GSRFinQADataset,
-    },
+DATASET_CONFIGS: dict[str, dict] = {
+    "finqa": {"config_name": "FinQA", "split": "FinQA"},
+    "convfinqa": {"config_name": "ConvFinQA", "split": "ConvFinQA"},
+    "tatqa": {"config_name": "TAT-DQA", "split": "TAT-DQA"},
 }
 
 # ---------------------------------------------------------------------------
-# Method configs
+# Method configs (GSR §4 hyperparameters)
 # ---------------------------------------------------------------------------
 
-METHOD_CONFIGS = {
+METHOD_CONFIGS: dict[str, dict] = {
     "gsr": {
         "class": GSRRetrieval,
         "alpha": 0.5,
@@ -118,87 +77,44 @@ METHOD_CONFIGS = {
 
 
 # ---------------------------------------------------------------------------
-# Metric computation (mirrors g4k factory_helper.py)
+# Metrics (§5.1)
 # ---------------------------------------------------------------------------
 
-class MRRMetric:
+def compute_mrr(results: list[RetrievalResult], k: int = 3) -> float:
     """Mean Reciprocal Rank at K."""
-
-    def __init__(self, k: int = 3):
-        self.k = k
-
-    def __call__(self, responses: list) -> dict:
-        mrr = 0.0
-        for resp in responses:
-            gt_id = str(resp.meta_data.get("reference_document", {}).get("id", ""))
-            if not gt_id:
-                continue
-            for rank, doc in enumerate(resp.retrieved_docs[: self.k], start=1):
-                if str(doc.id) == gt_id:
-                    mrr += 1.0 / rank
-                    break
-        score = mrr / len(responses) if responses else 0.0
-        return {"mrr_at_k": score, "metric": "MRR", "k": self.k}
+    mrr = 0.0
+    for r in results:
+        for rank, doc in enumerate(r.retrieved_docs[:k], start=1):
+            if str(doc.id) == str(r.ground_truth_id):
+                mrr += 1.0 / rank
+                break
+    return mrr / len(results) if results else 0.0
 
 
-class RecallMetric:
+def compute_recall(results: list[RetrievalResult], k: int = 3) -> float:
     """Recall at K."""
-
-    def __init__(self, k: int = 3):
-        self.k = k
-
-    def __call__(self, responses: list) -> dict:
-        hits = 0
-        for resp in responses:
-            gt_id = str(resp.meta_data.get("reference_document", {}).get("id", ""))
-            if not gt_id:
-                continue
-            retrieved_ids = [str(doc.id) for doc in resp.retrieved_docs[: self.k]]
-            if gt_id in retrieved_ids:
-                hits += 1
-        score = hits / len(responses) if responses else 0.0
-        return {f"recall_at_k": score, "metric": "Recall", "k": self.k}
+    hits = 0
+    for r in results:
+        ids = {str(d.id) for d in r.retrieved_docs[:k]}
+        if str(r.ground_truth_id) in ids:
+            hits += 1
+    return hits / len(results) if results else 0.0
 
 
-class NDCGMetric:
+def compute_ndcg(results: list[RetrievalResult], k: int = 3) -> float:
     """NDCG at K (binary relevance)."""
-
-    def __init__(self, k: int = 3):
-        self.k = k
-        import math
-        self.math = math
-
-    def __call__(self, responses: list) -> dict:
-        total = 0.0
-        for resp in responses:
-            gt_id = str(resp.meta_data.get("reference_document", {}).get("id", ""))
-            if not gt_id:
-                continue
-            ndcg = 0.0
-            for rank, doc in enumerate(resp.retrieved_docs[: self.k], start=1):
-                if str(doc.id) == gt_id:
-                    ndcg = 1.0 / self.math.log2(rank + 1)
-                    break
-            total += ndcg
-        score = total / len(responses) if responses else 0.0
-        return {"ndcg_at_k": score, "metric": "NDCG", "k": self.k}
+    total = 0.0
+    for r in results:
+        for rank, doc in enumerate(r.retrieved_docs[:k], start=1):
+            if str(doc.id) == str(r.ground_truth_id):
+                total += 1.0 / math.log2(rank + 1)
+                break
+    return total / len(results) if results else 0.0
 
 
 # ---------------------------------------------------------------------------
 # Core benchmark
 # ---------------------------------------------------------------------------
-
-def load_corpus_for_dataset(dataset_name: str, config_name: str | None) -> pd.DataFrame:
-    """Load full corpus (all splits) for a dataset."""
-    full_dataset = load_dataset(dataset_name, config_name)
-    dfs = []
-    if isinstance(full_dataset, DatasetDict):
-        for split_name in full_dataset.keys():
-            dfs.append(full_dataset[split_name].to_pandas())
-    else:
-        dfs.append(full_dataset.to_pandas())
-    return pd.concat(dfs, ignore_index=True)
-
 
 def run_gsr_benchmark(
     mode: str,
@@ -207,148 +123,102 @@ def run_gsr_benchmark(
     top_k: int = 3,
     device: str | None = None,
     output_dir: Path | None = None,
+    sample_size: int | None = None,
 ) -> dict:
     """
-    Run GSR retrieval benchmark on a dataset.
+    Run GSR retrieval benchmark on a T²-RAGBench subset.
 
-    Args:
-        mode:            "gsr" or "hybridgsr"
-        dataset:         "finqa", "convfinqa", "tatqa", or "all"
-        embedding_model: HuggingFace embedding model
-        top_k:           retrieval top-k
-        device:          torch device (auto-detected if None)
-        output_dir:      where to save inference logs
-
-    Returns:
-        dict of metric results
+    Returns dict of metric results.
     """
-    # Resolve device
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.info(f"Device: {device}")
 
-    # Get config
+    # Resolve configs
     ds_cfg = DATASET_CONFIGS.get(dataset)
     if ds_cfg is None:
-        raise ValueError(f"Unknown dataset: {dataset}. Available: {list(DATASET_CONFIGS.keys())}")
+        raise ValueError(f"Unknown dataset: {dataset}. Choose from {list(DATASET_CONFIGS)}")
+    method_cfg = dict(METHOD_CONFIGS.get(mode, {}))
+    if not method_cfg:
+        raise ValueError(f"Unknown mode: {mode}. Choose from {list(METHOD_CONFIGS)}")
 
-    method_cfg = METHOD_CONFIGS.get(mode)
-    if method_cfg is None:
-        raise ValueError(f"Unknown mode: {mode}. Available: {list(METHOD_CONFIGS.keys())}")
-
-    # ---- Load test split ----
-    logger.info(f"Loading dataset: {ds_cfg['name']}/{ds_cfg['config_name']}")
-    qa_dataset = load_dataset(
-        ds_cfg["name"],
-        ds_cfg.get("config_name"),
+    # Load dataset
+    split_data = load_t2ragbench_split(
+        config_name=ds_cfg["config_name"],
         split=ds_cfg["split"],
-    ).to_pandas()
-    logger.info(f"QA samples: {len(qa_dataset)}")
-
-    # ---- Load full corpus ----
-    logger.info("Loading full corpus for retrieval...")
-    corpus_df = load_corpus_for_dataset(ds_cfg["name"], ds_cfg.get("config_name"))
-    logger.info(f"Corpus size: {len(corpus_df)}")
-
-    # ---- Build GSR dataset ----
-    logger.info("Building GSR-enriched dataset...")
-    DatasetWrapper = ds_cfg["dataset_wrapper"]
-    dataset_obj = DatasetWrapper(
-        df=qa_dataset,
-        retrieval_query=ds_cfg["retrieval_query"],
-        meta_data_keys=ds_cfg["meta_data_keys"],
-        document_percentage=1.0,
-        corpus_df=corpus_df,
-        build_gsr_metadata=True,
+        sample_size=sample_size,
     )
-    logger.info(f"Corpus documents: {len(dataset_obj.context_collection)}")
+    logger.info(f"Queries: {len(split_data.queries)}, Corpus: {len(split_data.corpus)}")
 
-    # ---- Template coverage diagnostics ----
-    if hasattr(dataset_obj, "get_template_coverage_stats"):
-        stats = dataset_obj.get_template_coverage_stats()
-        logger.info("Template coverage stats:")
-        for k, v in stats.items():
-            logger.info(f"  {k}: {v}")
+    # Template coverage diagnostics (§5.3 Exp 5)
+    gsr_corpus = build_gsr_corpus(split_data.corpus)
+    stats = get_template_coverage_stats(gsr_corpus)
+    logger.info("Template coverage stats:")
+    for k, v in stats.items():
+        logger.info(f"  {k}: {v}")
 
-    # ---- Setup embeddings ----
+    # Embedding model
     from langchain_huggingface import HuggingFaceEmbeddings
     embeddings = HuggingFaceEmbeddings(
         model_name=embedding_model,
         model_kwargs={"device": device},
     )
 
-    # ---- Setup RAG method ----
-    logger.info(f"Initialising {mode} retrieval method...")
+    # Build retrieval method
     RAGClass = method_cfg.pop("class")
-    rag_kwargs = {k: v for k, v in method_cfg.items()}
-    rag_kwargs.update({
-        "context_collection": dataset_obj.get_context_collection(),
-        "embedding_function": embeddings,
-        "top_k": top_k,
-        "retrieval_only": True,
-        "device": device,
-    })
-    rag_method = RAGClass(**rag_kwargs)
-
-    # ---- Dummy runner (retrieval-only doesn't need LLM) ----
-    sampling_params = SamplingParams(temperature=0.0, max_tokens=0)
-    runner = BatchInferenceRunner(
-        sampling_params=sampling_params,
-        model="dummy",
-        base_url="http://localhost:9999",
+    rag_method = RAGClass(
+        corpus=split_data.corpus,
+        embedding_function=embeddings,
+        top_k=top_k,
+        device=device,
+        **method_cfg,
     )
 
-    # ---- Run retrieval ----
-    retrieval_queries = dataset_obj._generate_retrieval_queries()
-    logger.info(f"Running retrieval for {len(retrieval_queries)} queries...")
-    responses = rag_method.run(
-        runner=runner,
-        sys_prompt="",
-        user_prompts=dataset_obj.user_prompts,
-        prompt_meta_data=dataset_obj.prompt_meta_data,
-        retrieval_queries=retrieval_queries,
+    # Run retrieval
+    logger.info(f"Running {mode} retrieval for {len(split_data.queries)} queries...")
+    all_retrieved = rag_method.retrieve_batch(
+        queries=split_data.queries,
+        queries_meta=split_data.meta_data,
     )
 
-    # ---- Evaluate ----
-    metrics = [
-        MRRMetric(k=3),
-        RecallMetric(k=1),
-        RecallMetric(k=3),
-        RecallMetric(k=5),
-        NDCGMetric(k=3),
-    ]
+    # Build evaluation results
+    eval_results: list[RetrievalResult] = []
+    for i, (query, docs) in enumerate(zip(split_data.queries, all_retrieved)):
+        eval_results.append(RetrievalResult(
+            query=query,
+            retrieved_docs=docs,
+            ground_truth_id=split_data.ground_truth_ids[i],
+            meta_data=split_data.meta_data[i],
+        ))
 
-    results: dict = {}
+    # Compute metrics
+    metrics = {
+        "MRR@3": compute_mrr(eval_results, k=3),
+        "Recall@1": compute_recall(eval_results, k=1),
+        "Recall@3": compute_recall(eval_results, k=3),
+        "Recall@5": compute_recall(eval_results, k=5),
+        "NDCG@3": compute_ndcg(eval_results, k=3),
+    }
+
+    # Print results
     print("\n" + "=" * 60)
-    print(f"GSR-CACL BENCHMARK RESULTS  [{mode.upper()} on {dataset.upper()}]")
+    print(f"GSR-CACL BENCHMARK  [{mode.upper()} on {dataset.upper()}]")
     print("=" * 60)
-
-    for metric in metrics:
-        result = metric(responses.response_data)
-        results.update(result)
-        key = list(result.keys())[0]
-        print(f"  {metric.__class__.__name__}: {result[key]:.4f}")
-
+    for name, val in metrics.items():
+        print(f"  {name:>12}: {val:.4f}")
     print("=" * 60 + "\n")
 
-    # ---- Save inference log ----
+    # Save outputs
     if output_dir is None:
         ts = datetime.now().strftime("%y%m%d_%H%M%S")
         output_dir = Path(f"outputs/gsr_benchmark/{dataset}/{mode}_{ts}")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    import json
-    log_path = output_dir / "inference_log.json"
-    with open(log_path, "w", encoding="utf-8") as f:
-        json.dump([r.to_dict() for r in responses.response_data], f, indent=2, default=str)
-
-    # Save metrics
-    metrics_path = output_dir / "metrics.json"
-    with open(metrics_path, "w") as f:
-        json.dump(results, f, indent=2)
+    with open(output_dir / "metrics.json", "w") as f:
+        json.dump(metrics, f, indent=2)
 
     logger.info(f"Results saved to {output_dir}")
-    return results
+    return metrics
 
 
 # ---------------------------------------------------------------------------
@@ -358,62 +228,30 @@ def run_gsr_benchmark(
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="GSR-CACL Retrieval Benchmark on T²-RAGBench",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__,
     )
-    parser.add_argument(
-        "--mode",
-        type=str,
-        required=True,
-        choices=["gsr", "hybridgsr"],
-        help="Retrieval method",
-    )
-    parser.add_argument(
-        "--dataset",
-        type=str,
-        required=True,
-        choices=["finqa", "convfinqa", "tatqa", "all"],
-        help="Dataset subset",
-    )
-    parser.add_argument(
-        "--embedding",
-        type=str,
-        default="intfloat/multilingual-e5-large-instruct",
-        help="HuggingFace embedding model",
-    )
-    parser.add_argument(
-        "--top-k",
-        type=int,
-        default=3,
-        help="Retrieval top-k (default: 3)",
-    )
-    parser.add_argument(
-        "--device",
-        type=str,
-        default=None,
-        choices=["cuda", "cpu"],
-        help="Torch device (auto-detected if not specified)",
-    )
-    parser.add_argument(
-        "--output-dir",
-        type=str,
-        default=None,
-        help="Output directory for results",
-    )
+    parser.add_argument("--mode", type=str, required=True, choices=["gsr", "hybridgsr"])
+    parser.add_argument("--dataset", type=str, required=True,
+                        choices=["finqa", "convfinqa", "tatqa"])
+    parser.add_argument("--embedding", type=str,
+                        default="intfloat/multilingual-e5-large-instruct")
+    parser.add_argument("--top-k", type=int, default=3)
+    parser.add_argument("--device", type=str, default=None, choices=["cuda", "cpu"])
+    parser.add_argument("--output-dir", type=str, default=None)
+    parser.add_argument("--sample", type=int, default=None,
+                        help="Limit number of QA samples (for debugging)")
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir) if args.output_dir else None
-
     try:
-        results = run_gsr_benchmark(
+        run_gsr_benchmark(
             mode=args.mode,
             dataset=args.dataset,
             embedding_model=args.embedding,
             top_k=args.top_k,
             device=args.device,
             output_dir=output_dir,
+            sample_size=args.sample,
         )
-        logger.info("Benchmark completed successfully.")
     except Exception as e:
         logger.error(f"Benchmark failed: {e}", exc_info=True)
         sys.exit(1)

@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "Graph-Structured Retrieval + Constraint-Aware Contrastive Learning for Financial Documents"
 readme = "README.md"
 requires-python = ">= 3.10"
-authors = [{ name = "GSR-CACL Research Team" }]
+authors = [{ name = "natmiin322" }]
 keywords = ["retrieval", "knowledge-graph", "financial", "rag", "nlp"]
 classifiers = [
     "Development Status :: 3 - Alpha",

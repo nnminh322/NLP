@@ -94,6 +94,7 @@ trong đó \(H_T\) là entropy văn bản, \(H_S\) là entropy cấu trúc (vị
 $$I_{loss} \geq I_S + I_{discriminative}(H_N)$$
 
 Mất mát thông tin cấu trúc và thông tin phân biệt số liệu là không thể tránh khỏi khi dùng biểu diễn vector đơn. Do đó, biểu diễn đa không gian là điều kiện cần.
+
 ---
 
 ## 3. Ý tưởng thiết kế

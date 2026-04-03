@@ -41,21 +41,33 @@ def _is_total_cell(cell_text: str) -> bool:
 
 def build_constraint_kg(
     table_md: str,
-    headers: list[str],
-    cell_values: list[list[str | float | None]],
+    headers: list[str] | None = None,
+    cell_values: list[list[str | float | None]] | None = None,
     epsilon: float = 1e-4,
 ) -> ConstraintKG:
     """
-    Build a constraint knowledge graph from a parsed markdown table.
+    Build a constraint knowledge graph from a financial table.
+
+    Can be called in two ways:
+      1. build_constraint_kg(table_md)  — auto-parse from markdown string
+      2. build_constraint_kg(table_md, headers, cell_values)  — pre-parsed data
 
     Args:
         table_md:    raw markdown table string
-        headers:     list of column header strings
-        cell_values: 2D list of cell values (rows × cols)
+        headers:     list of column header strings (auto-parsed if None)
+        cell_values: 2D list of cell values (auto-parsed if None)
         epsilon:     tolerance for numerical checks
     Returns:
         ConstraintKG with nodes, edges, matched template.
     """
+    # Auto-parse when called with just table_md
+    if headers is None or cell_values is None:
+        rows = parse_markdown_rows(table_md)
+        if len(rows) < 2:
+            return ConstraintKG(table_md=table_md)
+        headers = rows[0]
+        cell_values = rows[1:]
+
     if not headers or len(cell_values) < 1:
         return ConstraintKG(table_md=table_md)
 
