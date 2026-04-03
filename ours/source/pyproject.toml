@@ -55,7 +55,7 @@ dev = [
     "ipywidgets>=8.1",
 ]
 gpu = [
-    "faiss-gpu>=1.7.4",
+    "faiss-gpu>=1.7.2",
 ]
 
 [build-system]

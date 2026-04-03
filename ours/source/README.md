@@ -21,7 +21,35 @@ retrieving financial text+table documents.
 
 ## Cloud Setup (Kaggle / Google Colab)
 
-### Option A: Kaggle Notebook (T4 GPU, 16GB VRAM — Free)
+### Option A: Google Colab (T4 free / A100 Pro)
+
+```python
+# Cell 1: Clone
+!git clone https://github.com/<YOUR_REPO>/gsr-cacl.git /content/gsr-cacl
+
+# Cell 2: Change directory and install
+import os
+os.chdir("/content/gsr-cacl/ours/source")
+# NOTE: faiss-gpu from PyPI only supports Python ≤3.10.
+# Colab uses Python 3.10+ so we use faiss-cpu; GPU vectors are handled via torch.
+!pip install -e ".[dev]" --quiet
+!pip install peft accelerate transformers faiss-cpu --quiet
+
+# Cell 3: Verify GPU
+import torch
+print(f"Python: {torch.__version__}")
+print(f"GPU: {torch.cuda.get_device_name(0)}")
+print(f"VRAM: {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB")
+
+# Cell 4: Train — choose preset by available VRAM
+# T4 16GB: LoRA + bge-large + gradient checkpointing
+!python -m gsr_cacl.train --dataset finqa --stage all --preset t4 --gradient-checkpointing
+
+# Cell 5: Benchmark
+!python -m gsr_cacl.benchmark_gsr --mode gsr --dataset finqa --top-k 3
+```
+
+### Option B: Kaggle Notebook (T4 GPU, 16GB VRAM — Free)
 
 ```python
 # Cell 1: Clone & Install
@@ -30,8 +58,8 @@ retrieving financial text+table documents.
 # Cell 2: Change directory and install
 import os
 os.chdir("/kaggle/working/gsr-cacl/ours/source")
-!pip install -e ".[gpu]" --quiet
-!pip install peft accelerate transformers --quiet
+!pip install -e ".[dev]" --quiet
+!pip install peft accelerate transformers faiss-cpu --quiet
 
 # Cell 3: Verify GPU
 import torch
@@ -46,34 +74,6 @@ print(f"VRAM: {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB")
     --preset t4 \
     --gradient-checkpointing \
     --save /kaggle/working/outputs
-
-# Cell 5: Benchmark
-!python -m gsr_cacl.benchmark_gsr --mode gsr --dataset finqa --top-k 3
-```
-
-### Option B: Google Colab (T4 free / A100 Pro)
-
-```python
-# Cell 1: Clone & Install
-!git clone https://github.com/<YOUR_REPO>/gsr-cacl.git /content/gsr-cacl
-
-# Cell 2: Change directory and install
-import os
-os.chdir("/content/gsr-cacl/ours/source")
-!pip install -e ".[gpu]" --quiet
-!pip install peft accelerate transformers --quiet
-
-# Cell 3: Verify GPU
-import torch
-print(f"GPU: {torch.cuda.get_device_name(0)}")
-print(f"VRAM: {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB")
-
-# Cell 4: Train
-# For free T4 (16GB VRAM):
-!python -m gsr_cacl.train --dataset finqa --stage all --preset t4 --gradient-checkpointing
-
-# For Colab Pro A100 (40GB VRAM):
-!python -m gsr_cacl.train --dataset finqa --stage all --preset a100
 
 # Cell 5: Benchmark
 !python -m gsr_cacl.benchmark_gsr --mode gsr --dataset finqa --top-k 3
@@ -107,15 +107,12 @@ print(f"VRAM: {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB")
 # Using conda
 conda activate master
 
-# Install package
+# Install package (use .[dev] — faiss-cpu is always installed; GPU vectors use torch)
 cd /project/ours/source
 pip install -e ".[dev]"
 
-# For GPU support
-pip install -e ".[gpu]"
-
 # For LoRA fine-tuning
-pip install peft accelerate transformers
+pip install peft accelerate transformers faiss-cpu
 
 # Verify
 python -c "import gsr_cacl; print(gsr_cacl.__version__)"
