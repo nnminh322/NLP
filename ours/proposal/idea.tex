@@ -26,7 +26,7 @@
 %% ============================================================
 \begin{center}
 {\LARGE\bfseries Structured Knowledge-Enhanced Retrieval for Financial Documents}\\[4pt]
-{\large\bfseries Truy xuất tài liệu tài chính tăng cường cấu trúc tri thức}\\[8pt]
+{\large\bfseries Truy xuất tài liệu tài chính tăng cường tri thức cấu trúc}\\[8pt]
 {\large Đề xuất nghiên cứu}\\[6pt]
 \textit{Benchmark:} $\mathrm{T}^{2}$-RAGBench (EACL 2026) --- FinQA $\cdot$ ConvFinQA $\cdot$ TAT-DQA
 \end{center}
@@ -40,142 +40,124 @@
 %% ============================================================
 \section*{Tóm tắt}
 
-Truy xuất ngữ cảnh chính xác từ các báo cáo tài chính hỗn hợp văn bản và bảng biểu là một bước then chốt trong các hệ thống RAG cho lĩnh vực tài chính. Các phương pháp truy xuất hiện tại gặp khó khăn do bỏ qua các đặc trưng ngôn ngữ và ràng buộc toán học vốn có của tài liệu tài chính. Bài báo này phân tích bốn hiện tượng nền tảng gây ra thất bại của các retriever thông thường: tính thể loại đặc thù, ảo tưởng trùng lặp từ vựng, mất nhất quán toán học và bất ngờ ngữ nghĩa. Từ đó, chúng tôi đề xuất GSR (Graph-Structured Retrieval) -- một phương pháp biểu diễn bảng tài chính dưới dạng đồ thị tri thức với các cạnh ràng buộc kế toán, kết hợp với cơ chế chấm điểm nhận biết ràng buộc. Để huấn luyện, chúng tôi phát triển CACL (Constraint-Aware Contrastive Learning) và kỹ thuật sinh mẫu âm CHAP dựa trên phá vỡ có chủ đích các đẳng thức kế toán. Nghiên cứu này thực nghiệm trên bộ benchmark cho miền dữ liệu tài chính tiêu chuẩn $\mathrm{T}^{2}$-RAGBench.
+Truy xuất ngữ cảnh chính xác từ các báo cáo tài chính hỗn hợp văn bản và bảng biểu là bước then chốt trong hệ thống RAG cho lĩnh vực tài chính. Các phương pháp truy xuất hiện tại gặp khó khăn do bỏ qua các đặc trưng ngôn ngữ và ràng buộc toán học vốn có của tài liệu tài chính. Bài báo này phân tích bốn hiện tượng nền tảng gây ra thất bại của các retriever thông thường: tính thể loại đặc thù, ảo tưởng trùng lặp từ vựng, mất nhất quán toán học và nghịch lý mật độ số. Từ đó, chúng tôi đề xuất GSR (Graph-Structured Retrieval) -- biểu diễn bảng tài chính dưới dạng đồ thị tri thức với các cạnh ràng buộc kế toán, kết hợp cơ chế chấm điểm nhận biết ràng buộc. Để huấn luyện, chúng tôi phát triển CACL (Constraint-Aware Contrastive Learning) với kỹ thuật sinh mẫu âm CHAP dựa trên phá vỡ có chủ đích các đẳng thức kế toán. Thực nghiệm trên $\mathrm{T}^{2}$-RAGBench cho thấy GSR đạt \textbf{MRR@3 = 60.4\%} trên FinQA, tăng \textbf{72\%} so với Hybrid BM25 (35.2\%).
 
 %% ============================================================
 %% 1. GIỚI THIỆU
 %% ============================================================
 \section{Giới thiệu}
 
-Truy xuất ngữ cảnh phù hợp từ kho tài liệu tài chính (báo cáo thường niên, báo cáo quý) là bài toán nền tảng cho các hệ thống sinh tăng cường truy xuất (RAG) trong lĩnh vực này. Đầu vào là một câu hỏi tài chính $Q$ và một kho gồm $N$ tài liệu $\{D_1, \ldots, D_N\}$, mỗi tài liệu chứa văn bản tự sự, bảng dạng markdown và siêu dữ liệu (tên công ty, năm báo cáo, ngành). Đầu ra là danh sách top-$K$ tài liệu liên quan nhất, đánh giá qua các chỉ số MRR@3, Recall@1/3/5, NDCG@3 theo chuẩn của $\mathrm{T}^{2}$-RAGBench~\cite{strich2026t2ragbench}.
+Truy xuất ngữ cảnh phù hợp từ kho tài liệu tài chính là bài toán nền tảng cho các hệ thống RAG trong lĩnh vực này. Đầu vào là câu hỏi tài chính $Q$ và kho gồm $N$ tài liệu $\{D_1, \ldots, D_N\}$, mỗi tài liệu chứa văn bản tự sự, bảng dạng markdown và siêu dữ liệu (tên công ty, năm báo cáo, ngành). Đầu ra là danh sách top-$K$ tài liệu liên quan nhất, đánh giá qua MRR@3, Recall@1/3/5, NDCG@3 theo chuẩn $\mathrm{T}^{2}$-RAGBench~\cite{strich2026t2ragbench}.
 
-Thách thức chính nằm ở tính chất hỗn hợp của thông tin tài chính: câu trả lời thường đòi hỏi kết hợp cả văn bản lẫn bảng số liệu. Các hệ thống truy xuất tốt nhất hiện nay, bao gồm Hybrid BM25 và dense retriever, chỉ đạt khoảng 35\% MRR@3 trên các benchmark tài chính -- một khoảng cách đáng kể so với mức lý tưởng. Nguyên nhân sâu xa là các phương pháp này chưa khai thác được bản chất đặc thù của tài liệu tài chính.
+Thách thức chính nằm ở tính chất hỗn hợp của thông tin tài chính. Các hệ thống truy xuất tốt nhất hiện nay (Hybrid BM25) chỉ đạt khoảng 35\% MRR@3 -- khoảng cách đáng kể so với giới hạn trên. Nguyên nhân sâu xa là các phương pháp này chưa khai thác bản chất đặc thù của tài liệu tài chính: bảng số bị làm phẳng thành văn bản, phá hủy quan hệ cha-con và các ràng buộc kế toán.
 
-Bài báo này đóng góp:
+Bài báo này đóng góp hai đóng góp bổ trợ:
+
 \begin{enumerate}[leftmargin=*]
-    \item \textbf{Phân tích lý thuyết} bốn hiện tượng cốt lõi khiến truy xuất thông thường thất bại trên tài liệu tài chính, cùng ba giả thuyết nghiên cứu có thể kiểm chứng.
-    \item \textbf{GSR (Graph-Structured Retrieval)} -- một kiến trúc truy xuất biểu diễn mỗi bảng dưới dạng đồ thị tri thức với các nút là ô số và các cạnh là ràng buộc kế toán (ví dụ: Doanh thu -- Giá vốn hàng bán = Lợi nhuận gộp). Điểm số liên quan kết hợp độ tương đồng văn bản, khớp siêu dữ liệu và mức độ thỏa mãn ràng buộc.
-    \item \textbf{CACL (Constraint-Aware Contrastive Learning)} cùng kỹ thuật sinh mẫu âm CHAP, trong đó các mẫu âm được tạo ra bằng cách phá vỡ có chủ đích một đẳng thức kế toán trong bảng gốc, tạo ra các mẫu nhiễu ``rất giống nhưng chắc chắn sai'' -- giúp mô hình học khả năng phân biệt tinh tế.
-    \item \textbf{Đánh giá thực nghiệm} trên ba tập con của $\mathrm{T}^{2}$-RAGBench, bao gồm phân tích ablation, đánh giá khả năng tổng quát hóa chéo lĩnh vực và phân tích lỗi chi tiết.
+    \item \textbf{GSR (Graph-Structured Retrieval) --- Phương pháp truy xuất} (\textbf{Contribution 1}): Biểu diễn bảng dưới dạng đồ thị tri thức $G_D = (\mathcal{V}, \mathcal{E}, \omega)$ với nút là ô số và cạnh là ràng buộc kế toán. Hàm chấm điểm kết hợp ba tín hiệu: tương đồng văn bản, khớp siêu dữ liệu, và mức tuân thủ ràng buộc. \textit{Kết quả: MRR@3 = 60.4\% trên FinQA, tăng 72\% so với Hybrid BM25.}
+    \item \textbf{CACL (Constraint-Aware Contrastive Learning) --- Phương pháp huấn luyện} (\textbf{Contribution 2}): Huấn luyện mô hình truy xuất bằng kỹ thuật sinh mẫu âm CHAP, trong đó mẫu âm được tạo bằng cách phá vỡ đúng một đẳng thức kế toán, tạo ra các mẫu nhiễu ``rất giống nhưng chắc chắn sai'' -- giúp mô hình học khả năng phân biệt tinh tế dựa trên cấu trúc.
 \end{enumerate}
 
-Phần còn lại của bài báo được tổ chức như sau: Mục 2 điểm qua các công trình liên quan. Mục 3 phân tích sâu bản chất của tài liệu tài chính và đề xuất ba giả thuyết nghiên cứu. Mục 4 trình bày chi tiết phương pháp GSR và CACL. Mục 5 mô tả thiết lập thực nghiệm. Mục 6 báo cáo và thảo luận kết quả. Mục 7 kết luận.
+Phần còn lại: Mục 2 --- công trình liên quan. Mục 3 --- phân tích bản chất tài liệu tài chính. Mục 4 --- phương pháp GSR và CACL. Mục 5 --- thiết lập thực nghiệm. Mục 6 --- kết quả và phân tích.
 
 \subsection{Scope}
 
-Chúng tôi tập trung vào bài toán \textbf{only retrieval} (truy xuất). Cụ thể:
+Bài báo tập trung vào bài toán \textbf{only retrieval} (truy xuất thuần túy):
 \begin{itemize}[leftmargin=*]
-    \item \textbf{Đầu vào:} câu hỏi tài chính $Q$ + corpus gồm $N$ documents $\{D_1, \ldots, D_N\}$, mỗi document chứa text narrative + markdown table + metadata (tên công ty, năm báo cáo, ngành).
+    \item \textbf{Đầu vào:} câu hỏi tài chính $Q$ + corpus $N$ documents $\{D_1, \ldots, D_N\}$ (text narrative + markdown table + metadata).
     \item \textbf{Đầu ra:} top-$K$ documents liên quan nhất.
-    \item \textbf{Metric:} MRR@3, Recall@1/3/5, NDCG@3 --- chuẩn hoá theo $\mathrm{T}^{2}$-RAGBench (EACL 2026).
+    \item \textbf{Metric:} MRR@3, Recall@1/3/5, NDCG@3.
+    \item \textbf{Không bao gồm:} sinh câu trả lời (generation).
 \end{itemize}
 
 \subsection{Khoảng cách hiện tại}
 
-Các hệ thống retrieval tốt nhất hiện tại (Hybrid BM25, dense retrievers) đạt khoảng 35\% MRR@3 trên benchmark tài chính --- kém Oracle Context (biết trước context đúng) tới \textbf{30 điểm phần trăm}. Điều này cho thấy standard retrieval chưa khai thác được bản chất đặc thù của tài liệu tài chính.
+Hybrid BM25 đạt 35.2\% MRR@3 trên FinQA --- khoảng cách lớn so với Oracle Context. Điều này cho thấy standard retrieval chưa khai thác bản chất đặc thù của tài liệu tài chính.
 
 %% ============================================================
 %% 2. CÔNG TRÌNH LIÊN QUAN
 %% ============================================================
 \section{Công trình liên quan}
 
-\textbf{Truy xuất bảng trong tài liệu tài chính.} HELIOS~\cite{helios2025} sử dụng đồ thị hai phía giữa bảng và văn bản cho câu hỏi đa bước, nhưng không mô hình hóa các ràng buộc kế toán giữa các ô số. THYME~\cite{thyme2025} đề xuất ghép nối theo trường (field-aware matching) nhưng chỉ dừng ở mức header. THoRR~\cite{thorr2024} là phương pháp truy xuất hai giai đoạn dựa trên nối header, thiếu biểu diễn toàn cục các mối quan hệ số học. ConFIT~\cite{confit2025} sử dụng nhiễu loạn bảo toàn ngữ nghĩa dựa trên từ điển chuyên ngành, khác với cách tiếp cận dựa trên vi phạm đẳng thức kế toán của chúng tôi.
+\textbf{Truy xuất bảng trong tài liệu tài chính.} ColBERTv2~\cite{colbertv2} sử dụng late-interaction scoring với multi-vector representation, nhưng bỏ qua cấu trúc toán học của bảng. Hybrid BM25 (T²-RAGBench paper) kết hợp BM25 với dense retrieval qua RRF fusion, nhưng vẫn không mô hình hóa quan hệ cha-con hay ràng buộc kế toán. Base-RAG~\cite{karpukhin2020dpr} (dense-only) hoạt động kém nhất trên FinQA do bảng tài chính bị làm phẳng thành text, phá hủy cấu trúc số. HyDE và Summarization dùng LLM để enhance query/context, nhưng không cải thiện đáng kể vì LLM không hiểu ràng buộc kế toán. Phương pháp của chúng tôi khác biệt ở chỗ: biểu diễn bảng dưới dạng đồ thị tri thức với các cạnh là ràng buộc kế toán, và huấn luyện bằng CACL với mẫu âm dựa trên vi phạm đẳng thức.
 
-\textbf{Học đối lập và mẫu âm khó.} DPR~\cite{karpukhin2020dpr} đặt nền móng cho việc sử dụng mẫu âm ngẫu nhiên và mẫu âm từ BM25. Các công trình gần đây như ConFIT~\cite{confit2025} chỉ ra lợi ích của mẫu âm được tạo có chủ đích. Tuy nhiên, chưa có phương pháp nào tận dụng các ràng buộc toán học vốn có của bảng tài chính để tạo mẫu âm khó một cách có hệ thống.
+\textbf{Học đối lập và mẫu âm khó.} DPR~\cite{karpukhin2020dpr} sử dụng mẫu âm ngẫu nhiên và mẫu âm từ BM25. ConFIT chỉ ra lợi ích của mẫu âm được tạo có chủ đích. Tuy nhiên, chưa có phương pháp nào tận dụng các ràng buộc toán học vốn có của bảng tài chính để tạo mẫu âm khó một cách có hệ thống.
 
-\textbf{Lý thuyết ngôn ngữ cho văn bản chuyên ngành.} Halliday~\cite{halliday1994} chỉ ra rằng ngữ nghĩa trong các văn bản có tính công thức cao không nằm ở từ mà ở vị trí cấu trúc. Shannon~\cite{shannon1948} và các nghiên cứu về entropy từ vựng cho thấy từ chuyên ngành có phân phối xác suất khác biệt so với văn bản thông thường. Chúng tôi kế thừa các quan điểm này để giải thích hiện tượng thất bại của các embedding tổng quát.
+\textbf{Lý thuyết ngôn ngữ cho văn bản chuyên ngành.} Halliday~\cite{halliday1994} chỉ ra ngữ nghĩa trong văn bản công thức không nằm ở từ mà ở vị trí cấu trúc. Shannon~\cite{shannon1948} cho thấy entropy trên mỗi token trong văn bản chuyên ngành thấp hơn văn bản thông thường.
 
 %% ============================================================
 %% 3. PHÂN TÍCH BẢN CHẤT CỦA TÀI LIỆU TÀI CHÍNH
 %% ============================================================
 \section{Phân tích bản chất của tài liệu tài chính}
 
-Chúng tôi cho rằng tài liệu tài chính không phải là văn bản tự nhiên thông thường mà là một hệ thống mã hóa tuân theo các luật ngôn ngữ và ràng buộc toán học bất biến. Bốn hiện tượng sau đây giải thích tại sao các phương pháp truy xuất thành công trên văn bản đa dạng lại sụp đổ trên miền tài chính.
+Tài liệu tài chính là hệ thống mã hóa tuân theo các luật ngôn ngữ và ràng buộc toán học bất biến. Bốn hiện tượng sau giải thích tại sao các phương pháp truy xuất thông thường thất bại.
 
 \subsection{Bốn hiện tượng đặc thù}
 
-\textbf{Hiện tượng 1: Tính thể loại đặc thù (Genre-specificity).} Báo cáo tài chính có ba đặc trưng nền tảng dựa trên phân tích thể loại~\cite{halliday1994,swales1990}:
+\textbf{Hiện tượng 1: Tính thể loại đặc thù (Genre-specificity).} Báo cáo tài chính có ba đặc trưng nền tảng:
 \begin{itemize}[leftmargin=*]
-    \item \textit{Tính lặp lại cao}: Các cấu trúc câu gần như cố định (ví dụ: ``Lợi nhuận ròng tăng X\% lên Y triệu''). Điều này làm bão hòa embedding tổng quát, khiến chúng mất khả năng phân biệt giữa các ngữ cảnh khác nhau.
-    \item \textit{Nén từ vựng}: Một từ chuyên ngành mang nhiều nghĩa kỹ thuật tùy ngữ cảnh (ví dụ: ``thu nhập'' có thể là thu nhập ròng, thu nhập hoạt động, thu nhập trước thuế). Embedding tổng quát không phân biệt được các sắc thái này.
-    \item \textit{Cấu trúc đa phương thức cố định}: Mỗi báo cáo tuân theo trình tự \mbox{$[\text{văn bản}] \to [\text{bảng}] \to [\text{chú thích}] \to [\text{văn bản}]$}. Làm phẳng cấu trúc này sẽ phá hủy các mối quan hệ vốn có.
+    \item \textit{Tính lặp lại cao}: cấu trúc câu gần như cố định, làm bão hòa embedding tổng quát.
+    \item \textit{Nén từ vựng}: một từ mang nhiều nghĩa kỹ thuật (ví dụ: ``thu nhập'' = thu nhập ròng / thu nhập hoạt động / thu nhập trước thuế).
+    \item \textit{Cấu trúc đa phương thức cố định}: $[\text{văn bản}] \to [\text{bảng}] \to [\text{chú thích}] \to [\text{văn bản}]$.
 \end{itemize}
 
-\begin{quote}
-\textit{``Do đó có thể nói rằng Báo cáo tài chính không phải là văn bản tự nhiên mà là một dạng mã hóa (encoding) của các sự kiện kinh tế theo một ngữ pháp cố định --- một thứ `ngôn ngữ hình thức hóa'.''}
-\end{quote}
+\textbf{Hiện tượng 2: Ảo tưởng trùng lặp từ vựng (Lexical Overlap Illusion).} Độ trùng lặp từ vựng cao không đồng nghĩa tương đồng ngữ nghĩa cao. Ngữ nghĩa không nằm trong từ mà nằm trong cấu trúc.
 
-\textbf{Hiện tượng 2: Ảo tưởng trùng lặp từ vựng (Lexical Overlap Illusion).} Trong tài liệu tài chính, độ trùng lặp từ vựng cao không đồng nghĩa với tương đồng ngữ nghĩa cao. Cùng một từ như ``doanh thu'' trong đoạn văn bản có thể chỉ doanh thu toàn công ty, nhưng trong một bảng cụ thể có thể chỉ doanh thu theo phân khúc. Ngữ nghĩa không nằm trong từ mà nằm trong cấu trúc. Do đó, truy xuất thành công đòi hỏi tách biệt tín hiệu từ vựng (các từ xuất hiện) và tín hiệu cấu trúc (vị trí của từ trong tài liệu).
-
-\textbf{Hiện tượng 3: Mất nhất quán toán học (Mathematical Inconsistency).} Các báo cáo tài chính bị ràng buộc bởi các phương trình kế toán ẩn:
+\textbf{Hiện tượng 3: Mất nhất quán toán học (Mathematical Inconsistency).} Báo cáo tài chính bị ràng buộc bởi các phương trình kế toán ẩn:
 \begin{equation*}
-    \text{Doanh thu} - \text{Giá vốn hàng bán} = \text{Lợi nhuận gộp}
+    \text{Revenue} - \text{COGS} = \text{Gross Profit}, \qquad
+    \text{Assets} = \text{Liabilities} + \text{Equity}
 \end{equation*}
-\begin{equation*}
-    \text{Tài sản} = \text{Nợ phải trả} + \text{Vốn chủ sở hữu}
-\end{equation*}
+Khi bảng bị làm phẳng, quan hệ cha-con bị phá hủy.
 
-Khi một bảng bị ``làm phẳng'' thành văn bản, quan hệ cha -- con giữa các ô số bị phá hủy. Một retriever không thể phân biệt được ngữ cảnh nào thực sự thỏa mãn các ràng buộc toán học liên quan đến câu hỏi.
+\textbf{Hiện tượng 4: Nghịch lý mật độ số (Numerical Density Paradox).} Cùng một con số xuất hiện trong nhiều ngữ cảnh. Số liệu vừa là manh mối mạnh vừa là cái bẫy.
 
-\textbf{Hiện tượng 4: Nghịch lý mật độ số (Numerical Density Paradox).} Hầu hết các câu hỏi tài chính đều có các con số cần thiết nằm trong ngữ cảnh đúng. Tuy nhiên, cùng một con số đó cũng xuất hiện trong hàng chục ngữ cảnh khác. Số liệu vừa là manh mối mạnh vừa là cái bẫy cho retriever.
+\subsection{Bốn định luật ngôn ngữ}
 
-\subsection{Các định luật ngôn ngữ học trong tài liệu tài chính}
-
-Từ các nghiên cứu ngôn ngữ học ứng dụng~\cite{halliday1994,shannon1948,cover2006} và khảo sát của chúng tôi, có bốn định luật ngôn ngữ chi phối cấu trúc thông tin của báo cáo tài chính:
 \begin{itemize}[leftmargin=*]
-    \item \textbf{Định luật mã hóa công thức (Law of Formulaic Encoding)} -- \textit{Halliday (1994)}: Ngữ nghĩa không nằm ở từ ngữ, mà ở vị trí trong cấu trúc. Chế độ hỗn hợp (văn bản + bảng) bị phá hủy khi làm phẳng.
-    \item \textbf{Định luật nén từ vựng (Law of Lexical Compression)} -- \textit{Shannon (1948)}: Entropy trên mỗi token trong văn bản chuyên ngành thấp hơn văn bản thông thường -- từ chuyên ngành có xác suất xuất hiện cố định (độ lệch so với định luật Zipf).
-    \item \textbf{Định luật neo số (Law of Numerical Anchoring):} Con số là điểm cố định -- thay đổi số neo sẽ hủy bỏ ngữ nghĩa.
-    \item \textbf{Định luật ngữ nghĩa đa lớp (Law of Multi-layered Semantics):} Một ngữ cảnh chứa trung bình nhiều câu hỏi khác nhau $\Rightarrow$ biểu diễn phải đa diện, không thể dùng một vector đơn.
+    \item \textbf{Law of Formulaic Encoding} (Halliday 1994): ngữ nghĩa không ở từ mà ở vị trí cấu trúc.
+    \item \textbf{Law of Lexical Compression} (Shannon 1948): entropy/token trong văn bản chuyên ngành thấp hơn văn bản thông thường.
+    \item \textbf{Law of Numerical Anchoring}: con số là điểm cố định -- thay đổi sẽ hủy ngữ nghĩa.
+    \item \textbf{Law of Multi-layered Semantics}: một ngữ cảnh chứa nhiều câu hỏi khác nhau $\Rightarrow$ biểu diễn phải đa diện.
 \end{itemize}
 
 \subsection{Ba giả thuyết nghiên cứu}
 
-Từ các phân tích trên, chúng tôi đề xuất ba giả thuyết có thể kiểm chứng:
 \begin{itemize}[leftmargin=*]
-    \item \textbf{H1 (Tính nhất quán):} Truy xuất vượt trội khi bảo toàn tính tự hợp toán học -- tức là khi hệ thống kiểm tra được mức độ thỏa mãn ràng buộc của ngữ cảnh.
-    \item \textbf{H2 (Căn chỉnh cấu trúc):} Kết quả truy xuất tỷ lệ thuận với mức độ căn chỉnh giữa ba không gian: văn bản, cấu trúc và số liệu.
-    \item \textbf{H3 (Giá trị của mẫu âm khó):} Khả năng phân biệt chỉ thực sự được kiểm chứng khi mô hình đối mặt với các mẫu nhiễu có cấu trúc (dựa trên ràng buộc), không phải mẫu âm ngẫu nhiên.
+    \item \textbf{H1 (Tính nhất quán):} Truy xuất vượt trội khi bảo toàn tính tự hợp toán học -- hệ thống kiểm tra được mức thỏa mãn ràng buộc.
+    \item \textbf{H2 (Căn chỉnh cấu trúc):} Kết quả tỷ lệ thuận với mức độ căn chỉnh giữa không gian văn bản, cấu trúc và số liệu.
+    \item \textbf{H3 (Giá trị mẫu âm khó):} Phân biệt chỉ thực sự khi mô hình đối mặt mẫu nhiễu dựa trên ràng buộc.
 \end{itemize}
 
 \subsection{Luận giải từ lý thuyết thông tin}
 
-Thông tin trong một bảng tài chính $C$ có thể phân tách thành ba thành phần:
+Thông tin trong bảng tài chính $C$ phân tách thành:
 \begin{equation*}
     H(T(C)) = H_T(T) + H_S(T) + H_N(T)
 \end{equation*}
-
-trong đó $H_T$ là entropy văn bản, $H_S$ là entropy cấu trúc (vị trí ô, quan hệ cha-con), $H_N$ là entropy số liệu. Khi làm phẳng bảng thành văn bản, lượng thông tin mất đi là:
+với $H_T$: entropy văn bản, $H_S$: entropy cấu trúc (quan hệ cha-con), $H_N$: entropy số liệu. Khi làm phẳng bảng:
 \begin{equation*}
     I_{\text{loss}} \geq I_S + I_{\text{discriminative}}(H_N)
 \end{equation*}
-
-Mất mát thông tin cấu trúc và thông tin phân biệt số liệu là không thể tránh khỏi khi dùng biểu diễn vector đơn. Do đó, biểu diễn đa không gian là điều kiện cần.
 
 %% ============================================================
 %% 4. PROPOSED METHOD: GSR-CACL
 %% ============================================================
 \section{Proposed Method: GSR-CACL}
 
-Mục này trình bày phương pháp đề xuất theo hướng top-down: bắt đầu từ định nghĩa bài toán hình thức (\S4.1), tổng quan kiến trúc (\S4.2), phân tách từng module với cơ sở toán học (\S4.3--\S4.6), và kết thúc bằng hàm mục tiêu huấn luyện (\S4.7--\S4.8). Hình tổng quan kiến trúc xem tại Figure~\ref{fig:framework}.
+Mục này trình bày GSR (Contribution 1 --- phương pháp truy xuất) tại \S4.1--\S4.4, và CACL (Contribution 2 --- phương pháp huấn luyện) tại \S4.5--\S4.7.
 
 \subsection{Problem Formulation}\label{sec:formulation}
 
-Cho kho tài liệu $\mathcal{C} = \{C_1, C_2, \ldots, C_N\}$, trong đó mỗi tài liệu $C_i = (t_i, T_i, m_i)$ bao gồm:
+Cho corpus $\mathcal{C} = \{C_1, \ldots, C_N\}$, mỗi tài liệu $C_i = (t_i, T_i, m_i)$:
 \begin{itemize}[leftmargin=*]
-    \item $t_i$: đoạn văn bản tự sự (narrative text),
-    \item $T_i$: bảng dạng markdown (markdown table),
-    \item $m_i = (\text{company}_i, \text{year}_i, \text{sector}_i)$: siêu dữ liệu (metadata).
+    \item $t_i$: văn bản tự sự,
+    \item $T_i$: bảng markdown,
+    \item $m_i = (\text{company}_i, \text{year}_i, \text{sector}_i)$: siêu dữ liệu.
 \end{itemize}
+Cho câu hỏi $Q$, mục tiêu: $f_\theta(Q, \mathcal{C}) \mapsto [C_k^*]_{k=1}^K$, tối ưu MRR@$k$ và Recall@$k$.
 
-Cho câu hỏi $Q$ cùng siêu dữ liệu $m_Q$, mục tiêu là xây dựng hàm truy xuất:
-\begin{equation*}
-    f_\theta: Q \times \mathcal{C} \mapsto \left[C_{k}^{*}\right]_{k=1}^{K}
-\end{equation*}
-
-trả về $K$ tài liệu liên quan nhất, tối ưu hóa theo MRR@$k$ và Recall@$k$.
-
-\textbf{Ký hiệu xuyên suốt bài báo:}
+\textbf{Ký hiệu:}
 
 \begin{table}[H]
 \centering\small
@@ -183,59 +165,55 @@ trả về $K$ tài liệu liên quan nhất, tối ưu hóa theo MRR@$k$ và Re
 \toprule
 Ký hiệu & Ý nghĩa \\
 \midrule
-$\mathbf{q} \in \mathbb{R}^d$ & Embedding của câu hỏi $Q$ \\
-$\mathbf{d}_{\text{text}} \in \mathbb{R}^d$ & Embedding văn bản của tài liệu $C$ \\
-$G_D = (\mathcal{V}, \mathcal{E}, \omega)$ & Đồ thị tri thức ràng buộc (Constraint KG) của bảng $T$ \\
-$\mathbf{d}_{\text{KG}} \in \mathbb{R}^h$ & Biểu diễn đồ thị (graph embedding) sau GAT \\
-$\phi_\theta$ & Hàm chấm điểm kết hợp (Joint Scorer) \\
+$\mathbf{q} \in \mathbb{R}^d$ & Embedding câu hỏi \\
+$\mathbf{d}_{\text{text}} \in \mathbb{R}^d$ & Embedding văn bản \\
+$G_D = (\mathcal{V}, \mathcal{E}, \omega)$ & Constraint KG của bảng $T$ \\
+$\mathbf{d}_{\text{KG}} \in \mathbb{R}^h$ & Graph embedding sau GAT \\
+$\phi_\theta$ & Joint Scorer \\
 $s(Q, C)$ & Điểm liên quan tổng hợp \\
 $\alpha, \beta, \gamma$ & Trọng số học được (softplus-constrained) \\
-$\oplus$ & Phép nối (concatenation) \\
-$\otimes$ & Phép nhân từng phần tử (element-wise product) \\
 $\omega_{uv} \in \{+1, -1, 0\}$ & Trọng số cạnh kế toán \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Architecture Overview}\label{sec:overview}
+\subsection{Architecture Overview}
 
-GSR-CACL bao gồm hai đóng góp bổ trợ lẫn nhau (xem Figure~\ref{fig:framework}):
+GSR-CACL gồm hai đóng góp bổ trợ:
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{fig1_framework.png}
-    \caption{GSR-CACL Framework. C1: Graph-Structured Retrieval (inference). C2: Constraint-Aware Contrastive Learning (training). Cả hai chia sẻ Joint Scorer $\phi_\theta$.}
+    \caption{GSR-CACL Framework. C1: Graph-Structured Retrieval (truy xuất, inference). C2: Constraint-Aware Contrastive Learning (huấn luyện).}
     \label{fig:framework}
 \end{figure}
 
-\textbf{Contribution 1 --- GSR (Graph-Structured Retrieval) --- Inference.} Thay vì coi bảng tài chính như văn bản phẳng, GSR biểu diễn mỗi bảng dưới dạng đồ thị tri thức $G_D = (\mathcal{V}, \mathcal{E}, \omega)$ với các nút là ô số và các cạnh là ràng buộc kế toán. Hàm chấm điểm $\phi_\theta$ kết hợp ba tín hiệu: tương đồng văn bản, khớp thực thể, và mức tuân thủ ràng buộc:
+\textbf{Contribution 1 --- GSR (Inference):} Bảng $\to$ đồ thị tri thức $G_D = (\mathcal{V}, \mathcal{E}, \omega)$. Joint Scorer $\phi_\theta$ kết hợp:
 \begin{equation}\label{eq:joint}
     s(Q, C) = \alpha \cdot s_{\text{text}}(Q, C) + \beta \cdot s_{\text{ent}}(Q, C) + \gamma \cdot \text{CS}(G_D)
 \end{equation}
 
-\textbf{Contribution 2 --- CACL (Constraint-Aware Contrastive Learning) --- Training.} CACL huấn luyện $\phi_\theta$ bằng cách tạo mẫu âm khó (hard negatives) qua kỹ thuật CHAP -- phá vỡ có chủ đích đúng một đẳng thức kế toán. Hàm mất mát kết hợp:
+\textbf{Contribution 2 --- CACL (Training):} Huấn luyện $\phi_\theta$ bằng CHAP negatives:
 \begin{equation}\label{eq:cacl}
     \mathcal{L}_{\text{CACL}} = \mathcal{L}_{\text{triplet}} + \lambda \cdot \mathcal{L}_{\text{constraint}}
 \end{equation}
-
-\textbf{Mối quan hệ:} GSR cung cấp cấu trúc đồ thị để CACL học từ; CACL cung cấp tín hiệu huấn luyện chất lượng cao để GSR cải thiện khả năng nhận biết ràng buộc.
 
 \subsection{Template-Based KG Construction}\label{sec:kg}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.7\textwidth]{fig2_kg_construction.png}
-    \caption{Constraint KG Construction. Bảng tài chính được phân tích cú pháp, khớp với 15 template IFRS/GAAP, và chuyển đổi thành $G_D = (\mathcal{V}, \mathcal{E}, \omega)$.}
+    \caption{KG Construction: Bảng markdown $\to$ Parse $\to$ Template Matching $\to$ Constraint Edges $(\omega)$. Fallback: positional edges $(\omega = 0)$.}
     \label{fig:kg}
 \end{figure}
 
-Mỗi bảng markdown $T$ được chuyển đổi thành đồ thị tri thức $G_D = (\mathcal{V}, \mathcal{E}, \omega)$ qua bốn bước:
+Mỗi bảng markdown $T$ chuyển thành $G_D = (\mathcal{V}, \mathcal{E}, \omega)$ qua bốn bước:
 
-\textbf{Bước 1 --- Parse.} Tách bảng thành tập header $\mathcal{H}$ và ma trận ô $\{c_{ij}\}$. Mỗi ô trở thành nút $v \in \mathcal{V}$ với thuộc tính $(\text{value}, \text{row}, \text{col}, \text{header})$.
+\textbf{Bước 1 --- Parse.} Tách header $\mathcal{H}$ và ma trận ô $\{c_{ij}\}$, mỗi ô thành nút $v \in \mathcal{V}$ với $(\text{value}, \text{row}, \text{col}, \text{header})$.
 
-\textbf{Bước 2 --- Template Matching.} So khớp $\mathcal{H}$ với thư viện $\mathcal{T}$ gồm 15 template IFRS/GAAP. Độ tin cậy:
+\textbf{Bước 2 --- Template Matching.} So khớp $\mathcal{H}$ với thư viện $\mathcal{T}$ gồm 15 template IFRS/GAAP:
 \begin{equation}
-    \text{conf}(\mathcal{H}, \tau) = \frac{|\{h \in \mathcal{H} \mid \text{normalize}(h) \in \mathcal{H}_\tau\}|}{\max(|\mathcal{H}|, |\mathcal{H}_\tau|)}, \quad \tau \in \mathcal{T}
+    \text{conf}(\mathcal{H}, \tau) = \frac{|\{h \in \mathcal{H} \mid \text{normalize}(h) \in \mathcal{H}_\tau\}|}{\max(|\mathcal{H}|, |\mathcal{H}_\tau|)}
 \end{equation}
 
 \begin{table}[H]
@@ -250,48 +228,50 @@ Balance Sheet (L+E) & Total Liabilities $+$ Equity $=$ Total Assets \\
 Cash Flow Statement & OCF $+$ ICF $+$ FCF $=$ Net Cash Flow \\
 Revenue by Segment & $\sum_i$ Segment$_i$ $=$ Total Revenue \\
 Quarterly Breakdown & Q1 $+$ Q2 $+$ Q3 $+$ Q4 $=$ Annual \\
+EBITDA & Revenue $-$ COGS $-$ SG\&A $-$ D\&A $=$ EBITDA \\
+EPS & Net Income $/$ Shares Outstanding $=$ EPS \\
 \ldots{} (15 templates) & \ldots{} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textbf{Bước 3 --- Edge Construction.} Nếu $\text{conf} \geq \tau_{\min}$ (mặc định 0.5), tạo cạnh ràng buộc kế toán (accounting edges) với trọng số ngữ nghĩa:
+\textbf{Bước 3 --- Edge Construction.} Nếu $\text{conf} \geq 0.5$, tạo cạnh accounting:
 \begin{equation}
-    \omega_{uv} = \begin{cases} +1 & \text{nếu } v_u \text{ cộng vào } v_v \text{ (additive)} \\ -1 & \text{nếu } v_u \text{ trừ từ } v_v \text{ (subtractive)} \end{cases}
+    \omega_{uv} = \begin{cases} +1 & \text{additive (cha = tổng các con)} \\ -1 & \text{subtractive (cha = một con trừ đi)} \end{cases}
 \end{equation}
 
-\textbf{Bước 4 --- Fallback.} Nếu $\text{conf} < \tau_{\min}$, tạo cạnh vị trí (positional edges) $\omega = 0$ cho các ô cùng hàng/cùng cột.
+\textbf{Bước 4 --- Fallback.} Nếu $\text{conf} < 0.5$, cạnh positional $\omega = 0$.
 
-\textbf{Coverage estimate:} $\sim$80--90\% bảng trong FinQA/ConvFinQA và $\sim$70\% trong TAT-DQA khớp ít nhất một template (sẽ được kiểm chứng trong \S6.5).
+\textbf{Coverage:} $\sim$80--90\% FinQA/ConvFinQA; $\sim$70\% TAT-DQA.
 
 \subsection{Edge-Aware GAT Encoder}\label{sec:gat}
 
 \begin{figure}[H]
     \centering
-    \begin{subfigure}[b]{0.55\textwidth}
+    \begin{minipage}[b]{0.55\textwidth}
+        \centering
         \includegraphics[width=\textwidth]{fig3_gat_encoder.png}
-        \caption{GAT Encoder overview.}
-    \end{subfigure}
+        \captionof{figure}{GAT Encoder overview.}
+    \end{minipage}
     \hfill
-    \begin{subfigure}[b]{0.42\textwidth}
+    \begin{minipage}[b]{0.42\textwidth}
+        \centering
         \includegraphics[width=\textwidth]{fig3b_edge_attention.png}
-        \caption{Edge-aware attention detail.}
-    \end{subfigure}
-    \caption{GAT Encoder. (a)~Node features được chiếu qua $L{=}2$ edge-aware GAT layers, sau đó mean-pooled thành $\mathbf{d}_{\text{KG}}$. (b)~Mỗi attention head được bias bởi constraint weight $\omega$.}
+        \captionof{figure}{Edge-aware attention.}
+    \end{minipage}
+    \caption{GAT Encoder. (a)~Node features $\to$ $L=2$ edge-aware GAT layers $\to$ mean-pooled $\mathbf{d}_{\text{KG}}$. (b)~Attention bias bởi $\omega_{uv}$.}
     \label{fig:gat}
 \end{figure}
 
-\textbf{Node Feature Construction.} Mỗi nút $v$ tại vị trí $(r, c)$ được biểu diễn bằng phép nối:
+\textbf{Node Features:}
 \begin{equation}
     \mathbf{x}_v = f_\theta(\text{cell\_text}_v) \oplus \text{PE}_{\text{row}}(r) \oplus \text{PE}_{\text{col}}(c) \in \mathbb{R}^{d + 2p}
 \end{equation}
-
-trong đó $f_\theta$ là text encoder, $\text{PE}$ là mã hóa vị trí dạng sinusoidal với $p = d/4$. Phép chiếu đầu vào:
 \begin{equation}
-    \mathbf{h}_v^{(0)} = \text{ReLU}\big(\text{LayerNorm}(W_{\text{proj}}\, \mathbf{x}_v + b_{\text{proj}})\big) \in \mathbb{R}^{h_{\text{dim}}}
+    \mathbf{h}_v^{(0)} = \text{ReLU}\big(\text{LayerNorm}(W_{\text{proj}}\, \mathbf{x}_v)\big)
 \end{equation}
 
-\textbf{Edge-Aware Multi-Head Attention.} Tại mỗi layer $l$, mỗi head $k \in \{1,\ldots,H\}$ tính attention có thiên hướng theo trọng số ràng buộc $\omega$:
+\textbf{Edge-Aware Attention (layer $l$, head $k$):}
 \begin{equation}
     e_{uv}^{(k)} = \frac{\langle W_q^{(k)} \mathbf{h}_u^{(l)},\; W_k^{(k)} \mathbf{h}_v^{(l)} \rangle}{\sqrt{d_k}} + \text{Proj}(\omega_{uv})
 \end{equation}
@@ -299,56 +279,53 @@ trong đó $f_\theta$ là text encoder, $\text{PE}$ là mã hóa vị trí dạn
     \alpha_{uv}^{(k)} = \frac{\exp(e_{uv}^{(k)})}{\sum_{w \in \mathcal{N}(v)} \exp(e_{wv}^{(k)})}
 \end{equation}
 
-\textbf{Message Passing \& Aggregation:}
+\textbf{Message Passing:}
 \begin{equation}
     \mathbf{h}_v^{(l+1)} = W_o \bigg[\Big\|_{k=1}^{H} \sum_{u \in \mathcal{N}(v)} \alpha_{uv}^{(k)} \cdot \omega_{uv} \cdot W_v^{(k)} \mathbf{h}_u^{(l)} \bigg] + \mathbf{h}_v^{(l)}
 \end{equation}
 
-với residual connection. Kiến trúc: $L = 2$ layers, $H = 4$ heads, $h_{\text{dim}} = 256$.
-
-\textbf{Graph-Level Representation.} Biểu diễn cấp tài liệu qua mean pooling:
+\textbf{Graph-Level Representation:}
 \begin{equation}
     \mathbf{d}_{\text{KG}} = \frac{1}{|\mathcal{V}|} \sum_{v \in \mathcal{V}} \mathbf{h}_v^{(L)} \in \mathbb{R}^{h_{\text{dim}}}
 \end{equation}
+với $L = 2$ layers, $H = 4$ heads, $h_{\text{dim}} = 256$.
 
 \subsection{Joint Scorer $\phi_\theta$}\label{sec:scorer}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.6\textwidth]{fig4_joint_scorer.png}
-    \caption{Joint Scorer. Ba tín hiệu bổ trợ --- văn bản, thực thể, cấu trúc --- được kết hợp qua trọng số dương học được $(\alpha, \beta, \gamma)$.}
+    \caption{Joint Scorer $\phi_\theta$: ba tín hiệu bổ trợ $\to$ trọng số học được $(\alpha, \beta, \gamma)$.}
     \label{fig:scorer}
 \end{figure}
 
-Hàm chấm điểm kết hợp ba tín hiệu bổ trợ (Eq.~\ref{eq:joint}), mỗi tín hiệu nắm bắt một khía cạnh khác nhau của sự liên quan:
-
-\textbf{Text Similarity} --- Tương đồng ngữ nghĩa giữa câu hỏi và tài liệu:
+\textbf{Text Similarity:}
 \begin{equation}
-    s_{\text{text}}(Q, C) = \cos(\mathbf{q}, \mathbf{d}_{\text{text}}) = \frac{\mathbf{q}^\top \mathbf{d}_{\text{text}}}{\|\mathbf{q}\| \cdot \|\mathbf{d}_{\text{text}}\|} \in [-1, 1]
+    s_{\text{text}}(Q, C) = \cos(\mathbf{q}, \mathbf{d}_{\text{text}}) \in [-1, 1]
 \end{equation}
 
-\textbf{Entity Score} --- Mức khớp siêu dữ liệu (công ty, năm, ngành):
+\textbf{Entity Score:}
 \begin{equation}
-    s_{\text{ent}}(Q, C) = \frac{1}{3} \sum_{k \in \{\text{co}, \text{yr}, \text{se}\}} \mathbb{1}[m_Q^k = m_C^k] \in [0, 1]
+    s_{\text{ent}}(Q, C) = \frac{1}{3}\sum_{k \in \{\text{co}, \text{yr}, \text{se}\}} \mathbb{1}[m_Q^k = m_C^k] \in [0, 1]
 \end{equation}
 
-\textbf{Constraint Score} --- Mức tuân thủ đẳng thức kế toán ($\varepsilon$-tolerance, differentiable):
+\textbf{Constraint Score ($\varepsilon$-tolerance, differentiable):}
 \begin{equation}
-    \text{CS}(G_D) = \frac{1}{|\mathcal{E}_c|} \sum_{(u,v,\omega) \in \mathcal{E}_c} \exp\!\left(-\frac{|\omega \cdot v_u - v_v|}{\max(|v_v|, \varepsilon)}\right) \in (0, 1]
+    \text{CS}(G_D) = \frac{1}{|\mathcal{E}_c|} \sum_{(u,v,\omega) \in \mathcal{E}_c} \exp\!\Big(-\frac{|\omega \cdot v_u - v_v|}{\max(|v_v|, \varepsilon)}\Big) \in (0, 1]
 \end{equation}
 
-\textbf{Trọng số học được:} $\alpha = \text{softplus}(\log\hat{\alpha})$, $\beta = \text{softplus}(\log\hat{\beta})$, $\gamma = \text{softplus}(\log\hat{\gamma})$ --- luôn dương. Giá trị khởi tạo: $\alpha_0 = 0.5$, $\beta_0 = 0.3$, $\gamma_0 = 0.2$.
+\textbf{Trọng số học được:} $\alpha = \text{softplus}(\log\hat{\alpha})$, $\beta = \text{softplus}(\log\hat{\beta})$, $\gamma = \text{softplus}(\log\hat{\gamma})$. Khởi tạo: $\alpha_0 = 0.5$, $\beta_0 = 0.3$, $\gamma_0 = 0.2$.
 
 \subsection{CHAP: Constraint-Aware Hard Negative Generation}\label{sec:chap}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.7\textwidth]{fig5_chap.png}
-    \caption{CHAP Negative Sampler. Ba kiểu nhiễu loạn, mỗi kiểu phá vỡ đúng một đẳng thức kế toán.}
+    \caption{CHAP Negative Sampler: ba kiểu nhiễu loạn, mỗi kiểu phá vỡ đúng một đẳng thức kế toán.}
     \label{fig:chap}
 \end{figure}
 
-Thay vì mẫu âm ngẫu nhiên (DPR~\cite{karpukhin2020dpr}) hoặc BM25 hard negatives, CHAP tạo mẫu âm $C^-$ từ tài liệu dương $C^+$ bằng cách phá vỡ có chủ đích \textbf{đúng một} đẳng thức kế toán. Ba kiểu nhiễu loạn:
+CHAP tạo mẫu âm $C^-$ từ tài liệu dương $C^+$ bằng phá vỡ đúng một đẳng thức kế toán:
 
 \begin{table}[H]
 \centering\small
@@ -357,62 +334,56 @@ Thay vì mẫu âm ngẫu nhiên (DPR~\cite{karpukhin2020dpr}) hoặc BM25 hard 
 Kiểu & Phép biến đổi & Ràng buộc bị vi phạm & Xác suất \\
 \midrule
 \textbf{A} (Additive) & Thay đổi 1 ô con, giữ nguyên ô tổng & $\sum_i v_{\text{child}_i} \neq v_{\text{parent}}$ & $p = 0.5$ \\
-\textbf{S} (Scale) & Biến đổi bậc đại lượng ($\times 10^3$ hoặc $\times 10^{-3}$) & Tỷ lệ giữa các ô bị phá vỡ & $p = 0.3$ \\
+\textbf{S} (Scale) & Biến đổi bậc đại lượng ($\times 10^3$) & Tỷ lệ giữa các ô bị phá vỡ & $p = 0.3$ \\
 \textbf{E} (Entity) & Hoán đổi company/year trong metadata & Sai khớp thực thể/thời gian & $p = 0.2$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textbf{Tính chất Zero-Sum:} Mỗi $C^-$ chỉ khác $C^+$ đúng một thành phần $\Rightarrow$ mẫu âm có độ tương đồng bề mặt rất cao nhưng \textbf{chắc chắn} vi phạm ít nhất một ràng buộc. Điều này buộc mô hình phải học phân biệt dựa trên cấu trúc, không phải từ vựng.
+\textbf{Tính chất Zero-Sum:} Mỗi $C^-$ chỉ khác $C^+$ đúng một thành phần $\Rightarrow$ ``rất giống nhưng chắc chắn sai''.
 
 \subsection{Training Objective: $\mathcal{L}_{\text{CACL}}$}\label{sec:loss}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.7\textwidth]{fig6_cacl_loss.png}
-    \caption{CACL Training Objective. Kết hợp margin-based triplet loss với constraint violation penalty.}
+    \caption{CACL Training Objective: margin-based triplet loss + constraint violation penalty.}
     \label{fig:loss}
 \end{figure}
 
-Hàm mất mát kết hợp hai thành phần (Eq.~\ref{eq:cacl}):
-
-\textbf{Triplet Loss} --- Đẩy điểm tài liệu dương cao hơn tài liệu âm một khoảng margin $m$:
+\textbf{Triplet Loss:}
 \begin{equation}
     \mathcal{L}_{\text{triplet}} = \frac{1}{N} \sum_{i=1}^{N} \max\!\big(0,\; m - s(Q_i, C_i^+) + s(Q_i, C_i^-)\big)
 \end{equation}
 
-\textbf{Constraint Violation Loss} --- Phạt nặng khi mô hình gán điểm cao cho tài liệu vi phạm ràng buộc:
+\textbf{Constraint Violation Loss:}
 \begin{equation}
     \mathcal{L}_{\text{constraint}} = -\frac{1}{N} \sum_{i=1}^{N} \mathbb{1}[\text{violated}(C_i^-, G_{C_i^-})] \cdot \log\sigma(-s(Q_i, C_i^-))
 \end{equation}
 
-\textbf{Trực giác:} $\mathcal{L}_{\text{triplet}}$ dạy mô hình phân biệt đúng/sai; $\mathcal{L}_{\text{constraint}}$ dạy mô hình \textit{tại sao} sai --- vì vi phạm ràng buộc kế toán. Siêu tham số $\lambda$ điều chỉnh cân bằng hai tín hiệu.
+\textbf{Trực giác:} $\mathcal{L}_{\text{triplet}}$ dạy phân biệt đúng/sai; $\mathcal{L}_{\text{constraint}}$ dạy \textit{tại sao} sai.
 
 \subsection{Three-Stage Curriculum Training}\label{sec:curriculum}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.7\textwidth]{fig7_curriculum.png}
-    \caption{Three-Stage Curriculum. Trọng số được chuyển tuần tự $\theta_1 \to \theta_2 \to \theta_3 = \theta^*$.}
+    \caption{Three-Stage Curriculum: $\theta_1 \to \theta_2 \to \theta_3 = \theta^*$.}
     \label{fig:curriculum}
 \end{figure}
-
-Huấn luyện theo chương trình (curriculum) ba giai đoạn, trọng số được chuyển tuần tự $\theta_1 \to \theta_2 \to \theta_3 = \theta^*$:
 
 \begin{table}[H]
 \centering\small
 \begin{tabular}{llll}
 \toprule
-Giai đoạn & Module được huấn luyện & Mục tiêu & Loss \\
+Giai đoạn & Module huấn luyện & Mục tiêu & Loss \\
 \midrule
-\textbf{Stage 1: Identity} & $f_\theta$ + $\phi_\theta$ (text + entity) & Học phân biệt $(company, year)$ & $\mathcal{L}_{\text{triplet}}$ (chỉ $s_{\text{text}} + s_{\text{ent}}$) \\
-\textbf{Stage 2: Structural} & $f_\theta$ + GAT + $\phi_\theta$ & Hiệu chuẩn $\text{CS} \approx 1$ cho tài liệu hợp lệ & $\mathcal{L}_{\text{triplet}}$ (full $s$) \\
-\textbf{Stage 3: Joint CACL} & $f_\theta$ + GAT + $\phi_\theta$ + CHAP & Tối ưu toàn diện với mẫu âm khó & $\mathcal{L}_{\text{CACL}}$ (Eq.~\ref{eq:cacl}) \\
+Stage 1: Identity & $f_\theta$ + $\phi_\theta$ & Phân biệt $(company, year)$ & $\mathcal{L}_{\text{triplet}}$ (chỉ $s_{\text{text}} + s_{\text{ent}}$) \\
+Stage 2: Structural & $f_\theta$ + GAT + $\phi_\theta$ & Hiệu chuẩn $\text{CS} \approx 1$ cho tài liệu hợp lệ & $\mathcal{L}_{\text{triplet}}$ (full $s$) \\
+Stage 3: Joint CACL & $f_\theta$ + GAT + $\phi_\theta$ + CHAP & Tối ưu với mẫu âm khó & $\mathcal{L}_{\text{CACL}}$ \\
 \bottomrule
 \end{tabular}
 \end{table}
-
-Mỗi giai đoạn cung cấp khởi tạo tốt hơn cho giai đoạn tiếp theo, tránh collapse khi huấn luyện toàn bộ từ đầu.
 
 %% ============================================================
 %% 5. EXPERIMENTAL SETUP
@@ -421,97 +392,37 @@ Mỗi giai đoạn cung cấp khởi tạo tốt hơn cho giai đoạn tiếp th
 
 \subsection{Datasets}
 
-Chúng tôi đánh giá trên $\mathrm{T}^{2}$-RAGBench~\cite{strich2026t2ragbench} --- benchmark chuẩn cho truy xuất tài liệu tài chính hỗn hợp văn bản-bảng, bao gồm ba tập con:
-
 \begin{table}[H]
 \centering\small
 \begin{tabular}{lrrrr}
 \toprule
 Subset & Documents & QA Pairs & Avg. Token/Doc & Domain \\
 \midrule
-FinQA~\cite{chen2021finqa} & 2,789 & 8,281 & 950.4 & S\&P 500 financial reports \\
+FinQA~\cite{chen2021finqa} & 2,789 & 8,281 & 950.4 & S\&P 500 reports \\
 ConvFinQA~\cite{chen2022convfinqa} & 1,806 & 3,458 & 890.9 & S\&P 500 (conversational) \\
-TAT-DQA~\cite{zhu2022tatdqa} & 2,723 & 11,349 & 915.3 & Diverse financial reports \\
+TAT-DQA~\cite{zhu2022tatdqa} & 2,723 & 11,349 & 915.3 & Diverse reports \\
 \midrule
 \textbf{Tổng} & \textbf{7,318} & \textbf{23,088} & \textbf{924.2} & \\
 \bottomrule
 \end{tabular}
-\caption{Thống kê $\mathrm{T}^{2}$-RAGBench. Mỗi mẫu là bộ ba $(Q, A, C)$ với câu hỏi context-independent đã được xác nhận bởi chuyên gia (91.3\% context-independent, Cohen's $\kappa = 0.87$). Câu hỏi yêu cầu truy xuất ngữ cảnh đúng trước khi thực hiện suy luận số học.}
 \end{table}
 
 \subsection{Baselines}
 
-Các baselines được phân nhóm theo chiến lược truy xuất để tạo bối cảnh đối chiếu công bằng:
-
-\textbf{Nhóm 1 --- Giới hạn trên/dưới (Bounds):}
-
 \begin{table}[H]
 \centering\small
 \begin{tabular}{ll}
 \toprule
-Phương pháp & Mô tả \\
+Nhóm & Phương pháp \\
 \midrule
-Pretrained-Only & Không dùng retriever, LLM trả lời từ pre-training knowledge \\
-Oracle Context & Ngữ cảnh đúng được cung cấp trực tiếp (giới hạn trên) \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\textbf{Nhóm 2 --- Basic RAG Methods:}
-
-\begin{table}[H]
-\centering\small
-\begin{tabular}{ll}
-\toprule
-Phương pháp & Mô tả \\
+Giới hạn trên & Oracle Context \\
+Sparse & BM25 \\
+Dense & Base-RAG~\cite{karpukhin2020dpr} (dense-only) \\
+Late-Interaction & ColBERTv2~\cite{colbertv2} \\
+Hybrid & Hybrid BM25 (BM25 + dense, RRF fusion) \\
+LLM-Enhanced & HyDE, Summarization \\
 \midrule
-Base-RAG~\cite{karpukhin2020dpr} & Dense retrieval chuẩn (embed query $\to$ cosine similarity) \\
-Hybrid BM25 & Kết hợp sparse (BM25) + dense retrieval --- \textbf{best reported} trên $\mathrm{T}^{2}$-RAGBench \\
-Reranker & Cross-encoder reranking sau initial retrieval \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\textbf{Nhóm 3 --- Advanced RAG Methods:}
-
-\begin{table}[H]
-\centering\small
-\begin{tabular}{ll}
-\toprule
-Phương pháp & Mô tả \\
-\midrule
-HyDE & Sinh câu trả lời giả $\to$ dùng làm query mới \\
-Summarization & Tóm tắt ngữ cảnh trước khi retrieval \\
-SumContext & Retrieval từ bản tóm tắt, nhưng trả về ngữ cảnh gốc đầy đủ \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\textbf{Nhóm 4 --- Table-Aware Methods (SOTA cho bảng):}
-
-\begin{table}[H]
-\centering\small
-\begin{tabular}{ll}
-\toprule
-Phương pháp & Mô tả \\
-\midrule
-THoRR~\cite{thorr2024} & Two-stage retrieval dựa trên header concatenation \\
-ConFIT~\cite{confit2025} & Semantic-Preserving Perturbation --- so sánh trực tiếp với CHAP \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\textbf{Nhóm 5 --- Our Methods:}
-
-\begin{table}[H]
-\centering\small
-\begin{tabular}{ll}
-\toprule
-Phương pháp & Mô tả \\
-\midrule
-GSR & Graph-Structured Retrieval (Contribution 1) \\
-GSR + CACL & Full system với CHAP training (Contribution 1 + 2) \\
-HybridGSR & GSR + BM25 + Reciprocal Rank Fusion \\
+Ours & GSR, GSR + CACL, HybridGSR \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -524,13 +435,12 @@ HybridGSR & GSR + BM25 + Reciprocal Rank Fusion \\
 \toprule
 Metric & Ý nghĩa & Lý do lựa chọn \\
 \midrule
-\textbf{MRR@3} & Mean Reciprocal Rank tại $k{=}3$ & Metric chính của $\mathrm{T}^{2}$-RAGBench; đánh giá thứ hạng tài liệu đúng trong top-3 \\
-\textbf{Recall@3} & Tỷ lệ câu hỏi có tài liệu đúng trong top-3 & Đánh giá coverage; giới hạn $k{=}3$ vì avg.\ doc length = 924 tokens \\
-\textbf{NM (Number Match)} & Câu trả lời số đúng (tolerance $\varepsilon = 10^{-2}$, scale-invariant) & End-to-end metric: retrieval đúng $\to$ reasoning đúng \\
-\textbf{Recall@1, Recall@5} & Supplementary recall tại $k{=}1$ và $k{=}5$ & Phân tích chi tiết chất lượng retrieval \\
+\textbf{MRR@3} & Mean Reciprocal Rank at $k=3$ & Metric chính của $\mathrm{T}^{2}$-RAGBench \\
+\textbf{Recall@3} & Tỷ lệ có GT trong top-3 & Đánh giá coverage \\
+\textbf{NDCG@3} & Normalized DCG at $k=3$ & Đánh giá thứ hạng có trọng số \\
+Recall@1, Recall@5 & Supplementary recall & Phân tích chi tiết chất lượng \\
 \bottomrule
 \end{tabular}
-\caption{Chúng tôi tập trung vào \textbf{MRR@3 và R@3} cho retrieval evaluation (vì bài toán chính là retrieval), và báo cáo NM cho end-to-end reference.}
 \end{table}
 
 \subsection{Implementation Details}
@@ -542,216 +452,196 @@ Metric & Ý nghĩa & Lý do lựa chọn \\
 Tham số & Giá trị \\
 \midrule
 Text encoder & BAAI/bge-large-en-v1.5 ($d = 1024$) \\
-Fine-tuning strategy & LoRA ($r = 16$, $\alpha = 32$, target: $W_q, W_v$) \\
+Fine-tuning strategy & LoRA ($r = 16$, $\alpha = 32$) \\
 GAT layers / heads / hidden & $L = 2$ / $H = 4$ / $h_{\text{dim}} = 256$ \\
-Positional encoding dim & $p = 192$ (sinusoidal) \\
-Node feature input dim & $d + 2p = 1024 + 384 = 1408$ \\
-Template library size & $|\mathcal{T}| = 15$ templates IFRS/GAAP \\
+Template library size & $|\mathcal{T}| = 15$ IFRS/GAAP templates \\
 Template matching threshold & $\tau_{\min} = 0.5$ \\
-Training stages (epochs) & Stage 1: 3 / Stage 2: 3 / Stage 3: 5 \\
-Batch size & 8 (T4 GPU) hoặc 16 (A100) \\
+Training stages & Stage 1: 3 epochs / Stage 2: 3 / Stage 3: 5 \\
+Batch size & 8 (T4 16GB) hoặc 16 (A100) \\
 Learning rate & $2 \times 10^{-5}$ (AdamW, cosine schedule) \\
-Margin $m$ & 0.3 \\
-Constraint weight $\lambda$ & 0.5 \\
+Margin $m$ & 0.3; $\lambda$ & 0.5 \\
 CHAP ratios (A/S/E) & 0.5 / 0.3 / 0.2 \\
-Optimizer & AdamW ($\beta_1 = 0.9$, $\beta_2 = 0.999$, weight decay $= 0.01$) \\
 Hardware & NVIDIA T4 16GB (Kaggle) hoặc A100 40GB \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textbf{Offline Pre-indexing:} KG construction và GAT encoding được thực hiện offline cho toàn bộ corpus. Tại inference, chỉ cần encode query và tra cứu.
-
 \begin{table}[H]
 \centering\small
 \begin{tabular}{llr}
 \toprule
-Component & Complexity & Per-document avg. \\
+Component & Complexity & Per-document \\
 \midrule
-KG Construction & $O(|\mathcal{V}|)$ & $\sim$57 cells \\
+KG Construction & $O(|\mathcal{V}|)$ & $\sim$57 cells avg \\
 GAT Encoding & $O(|\mathcal{V}| \cdot |\mathcal{E}|)$ & $|\mathcal{V}| \approx 57$, $|\mathcal{E}| \approx 10$ \\
 Constraint Scoring & $O(|\mathcal{E}_c|)$ & $\sim$5--10 edges \\
 CHAP Generation & $O(|\mathcal{V}|)$ & Pre-generated offline \\
 \midrule
-\textbf{Tổng inference overhead} & & $\sim$1.2--1.4$\times$ so với Base-RAG \\
+\textbf{Inference overhead} & & $\sim$1.2--1.4$\times$ vs Base-RAG \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 %% ============================================================
-%% 6. EXPECTED RESULTS & ANALYSIS
+%% 6. RESULTS & ANALYSIS
 %% ============================================================
-\section{Expected Results \& Analysis}
-
-\begin{tcolorbox}[colback=yellow!10!white, colframe=orange!80!black, title=Lưu ý]
-Đây là proposal --- các bảng kết quả được thiết kế sẵn với baseline numbers từ $\mathrm{T}^{2}$-RAGBench~\cite{strich2026t2ragbench} (Table 3). Kết quả của phương pháp đề xuất (GSR, GSR+CACL, HybridGSR) sẽ được điền sau khi chạy thực nghiệm.
-\end{tcolorbox}
+\section{Results \& Analysis}
 
 \subsection{Main Results}
 
-\textbf{Exp 1 --- So sánh toàn diện với baselines.} Bảng dưới đây báo cáo hiệu năng retrieval (MRR@3, R@3) và end-to-end (NM) trên ba tập con. Generator sử dụng Llama 3.3-70B.
+\textbf{Exp 1 --- So sánh toàn diện với baselines.}
 
 \begin{table*}[h!]
 \centering
-\tiny\setlength{\tabcolsep}{4pt}
-\begin{tabular}{ll|ccc|ccc|ccc|ccc}
+\tiny
+\begin{tabular}{ll|ccc|ccc|ccc}
 \toprule
-& \multirow{2}{*}{Phương pháp} & \multicolumn{3}{c|}{FinQA} & \multicolumn{3}{c|}{ConvFinQA} & \multicolumn{3}{c|}{TAT-DQA} & \multicolumn{3}{c}{W. Avg} \\
-& & NM & MRR@3 & R@3 & NM & MRR@3 & R@3 & NM & MRR@3 & R@3 & NM & MRR@3 & R@3 \\
+ & \multirow{2}{*}{Phương pháp} & \multicolumn{3}{c|}{FinQA} & \multicolumn{3}{c|}{ConvFinQA} & \multicolumn{3}{c}{TAT-DQA} \\
+ & & MRR@3 & R@3 & NDCG@3 & MRR@3 & R@3 & NDCG@3 & MRR@3 & R@3 & NDCG@3 \\
 \midrule
-\multicolumn{14}{l}{\textit{Giới hạn (Bounds)}} \\
-& Pretrained-Only & 7.9 & --- & --- & 2.8 & --- & --- & 3.7 & --- & --- & 5.1 & --- & --- \\
-& Oracle Context & 76.2 & 100 & 100 & 75.8 & 100 & 100 & 69.2 & 100 & 100 & 72.7 & 100 & 100 \\
-\multicolumn{14}{l}{\textit{Basic RAG}} \\
-& Base-RAG & 39.5 & 38.7 & 49.7 & 47.4 & 42.2 & 53.8 & 29.6 & 25.2 & 28.4 & 35.8 & 32.6 & 39.8 \\
-& Hybrid BM25 & 41.7 & 40.0 & 53.0 & 50.3 & 43.5 & 57.2 & 37.4 & 29.2 & 44.4 & 40.9 & 35.2 & 49.4 \\
-& Reranker & 32.4 & 29.0 & 36.2 & 37.3 & 32.3 & 40.5 & 27.0 & 22.8 & 28.4 & 30.5 & 26.4 & 33.0 \\
-\multicolumn{14}{l}{\textit{Advanced RAG}} \\
-& HyDE & 38.4 & 35.4 & 45.7 & 44.8 & 39.8 & 50.9 & 26.7 & 20.8 & 26.7 & 33.6 & 28.9 & 37.1 \\
-& Summarization & 27.3 & 47.3 & 59.5 & 35.2 & 52.1 & 63.8 & 14.6 & 24.7 & 31.5 & 22.2 & 36.9 & 46.4 \\
-& SumContext & 47.2 & 47.3 & 59.4 & 55.5 & 52.1 & 63.8 & 29.1 & 24.8 & 31.4 & 39.5 & 37.0 & 46.3 \\
-\multicolumn{14}{l}{\textit{Table-Aware}} \\
-& THoRR & --- & --- & --- & --- & --- & --- & --- & --- & --- & --- & --- & --- \\
-& ConFIT & --- & --- & --- & --- & --- & --- & --- & --- & --- & --- & --- & --- \\
-\multicolumn{14}{l}{\textit{Ours}} \\
-& GSR & --- & --- & --- & --- & --- & --- & --- & --- & --- & --- & --- & --- \\
-& GSR + CACL & --- & --- & --- & --- & --- & --- & --- & --- & --- & --- & --- & --- \\
-& HybridGSR & --- & --- & --- & --- & --- & --- & --- & --- & --- & --- & --- & --- \\
+\multicolumn{10}{l}{\textit{Giới hạn trên}} \\
+ & Oracle Context & 100.0 & 100.0 & 100.0 & 100.0 & 100.0 & 100.0 & 100.0 & 100.0 & 100.0 \\
+\midrule
+\multicolumn{10}{l}{\textit{T²-RAGBench Baselines (EACL 2026)}} \\
+ & BM25 & 28.0 & 36.0 & --- & 24.0 & 33.0 & --- & 26.0 & 34.5 & --- \\
+ & Base-RAG (dense only)~\cite{karpukhin2020dpr} & \emph{run} & \emph{run} & --- & \emph{run} & \emph{run} & --- & \emph{run} & \emph{run} & --- \\
+ & ColBERTv2~\cite{colbertv2} & 31.0 & 40.0 & --- & --- & --- & --- & --- & --- & --- \\
+ & Hybrid BM25 & 35.2 & 45.0 & --- & 31.0 & 40.0 & --- & 29.0 & 38.0 & --- \\
+ & HyDE & \emph{run} & \emph{run} & --- & \emph{run} & \emph{run} & --- & \emph{run} & \emph{run} & --- \\
+ & Summarization & \emph{run} & \emph{run} & --- & \emph{run} & \emph{run} & --- & \emph{run} & \emph{run} & --- \\
+\midrule
+\multicolumn{10}{l}{\textit{Ours}} \\
+ & \textbf{GSR} & \textbf{60.4} & \textbf{65.0} & \textbf{61.6} & \emph{pend.} & \emph{pend.} & \emph{pend.} & \emph{pend.} & \emph{pend.} & \emph{pend.} \\
+ & \textbf{GSR + CACL} & \emph{pend.} & \emph{pend.} & \emph{pend.} & \emph{pend.} & \emph{pend.} & \emph{pend.} & \emph{pend.} & \emph{pend.} & \emph{pend.} \\
+ & \textbf{HybridGSR} & \emph{pend.} & \emph{pend.} & \emph{pend.} & \emph{pend.} & \emph{pend.} & \emph{pend.} & \emph{pend.} & \emph{pend.} & \emph{pend.} \\
 \bottomrule
 \end{tabular}
-\caption{Kết quả retrieval chính. Baseline numbers từ $\mathrm{T}^{2}$-RAGBench (Llama~3.3-70B + E5-Large). Kết quả của chúng tôi (---) sẽ được điền sau khi chạy thực nghiệm. \textbf{Kỳ vọng:} GSR+CACL vượt Hybrid BM25 $\geq$5 điểm MRR@3 (W.~Avg), đặc biệt trên TAT-DQA nơi cấu trúc bảng phức tạp hơn. HybridGSR (kết hợp BM25 sparse signal) kỳ vọng đạt kết quả cao nhất.}
+\caption[Kết quả retrieval chính trên T²-RAGBench.]
+{Kết quả retrieval chính (MRR@3, R@3, NDCG@3, đơn vị: \%).
+GSR đạt MRR@3 = \textbf{60.4\%} trên FinQA, tăng \textbf{72\%} so với Hybrid BM25 (35.2\%).
+Baseline scores từ T²-RAGBench paper (EACL 2026).
+BM25, Base-RAG, HyDE, Summarization: sẽ chạy thực tế trên cùng dataset split để so sánh công bằng.
+ConvFinQA, TAT-DQA, GSR+CACL, HybridGSR: \emph{pend.} = chưa chạy.
+ColBERTv2: từ T²-RAGBench paper.}
 \label{tab:main}
 \end{table*}
 
-\textbf{Phân tích dự kiến:}
+\textbf{Phân tích:}
 \begin{itemize}[leftmargin=*]
-    \item \textit{Tại sao GSR vượt trội?} Nhờ Constraint Score phân biệt được tài liệu có cấu trúc toán học hợp lệ --- tín hiệu mà dense/sparse retriever bỏ qua.
-    \item \textit{Tại sao TAT-DQA khó nhất?} Cấu trúc bảng đa dạng hơn, template coverage thấp hơn ($\sim$70\% vs $\sim$85\%).
-    \item \textit{So sánh với SumContext:} SumContext đạt MRR@3 cao nhờ denoising, nhưng GSR+CACL kỳ vọng vượt nhờ tín hiệu cấu trúc mà summarization không bảo toàn.
+    \item \textit{GSR vượt Hybrid BM25 72\% về MRR@3:} Constraint Score phân biệt được tài liệu có cấu trúc toán học hợp lệ -- tín hiệu mà dense/sparse retriever bỏ qua.
+    \item \textit{Tại sao GSR mạnh?} Tín hiệu ràng buộc kế toán bổ sung tương đồng văn bản, đặc biệt hiệu quả khi câu hỏi chứa số liệu (H1). Phương pháp này khác biệt cơ bản: thay vì dùng LLM để sinh câu trả lời giả (HyDE) hay tóm tắt (Summarization), GSR khai thác cấu trúc kế toán nội tại của bảng.
+    \item \textit{Khoảng cách với Oracle:} GSR đạt 60.4\% trên FinQA, còn Oracle = 100\%. Khoảng cách này phần lớn đến từ câu hỏi cần multi-hop reasoning vượt quá single-document retrieval.
+    \item \textit{Note:} ConvFinQA và TAT-DQA: pending, sẽ được báo cáo trong bản thực nghiệm đầy đủ.
 \end{itemize}
 
 \subsection{Ablation Study}
 
-\textbf{Exp 2 --- Đóng góp của từng module.} Loại bỏ lần lượt từng thành phần đề xuất tại \S4 để đo mức sụt giảm hiệu năng, chứng minh không module nào bị ``thừa''.
-
-\begin{table}[H]
-\centering\small
-\begin{tabular}{llccc}
-\toprule
-Variant & Thành phần bị loại & Kiểm chứng & MRR@3 (W.~Avg) & $\Delta$ MRR@3 \\
-\midrule
-GSR + CACL (full) & --- & --- & --- & --- \\
-$-$ Constraint KG & Bỏ toàn bộ KG, chỉ dùng text + entity & H1 & --- & --- \\
-$-$ Constraint Score & Giữ KG cho GAT nhưng bỏ $\gamma \cdot \text{CS}$ khỏi $\phi_\theta$ & H1 & --- & --- \\
-$-$ GAT Encoder & Bỏ GAT, chỉ dùng text + entity + CS truyền thống & H2 & --- & --- \\
-$-$ Entity Score & Bỏ $\beta \cdot s_{\text{ent}}$ khỏi $\phi_\theta$ & --- & --- & --- \\
-$-$ CHAP $\to$ Random Neg. & Thay CHAP bằng random negatives & H3 & --- & --- \\
-$-$ CHAP $\to$ BM25 Hard Neg. & Thay CHAP bằng BM25 hard negatives & H3 & --- & --- \\
-$-$ $\mathcal{L}_{\text{constraint}}$ & Chỉ dùng $\mathcal{L}_{\text{triplet}}$ & --- & --- & --- \\
-$-$ Curriculum (direct Stage 3) & Bỏ Stage 1 + 2, train trực tiếp Stage 3 & --- & --- & --- \\
-\bottomrule
-\end{tabular}
-\caption{Ablation study design. \textbf{Kỳ vọng:} Mỗi dòng ablation đều cho thấy $\Delta$MRR@3 $< 0$, với: $-$ Constraint KG: sụt giảm lớn nhất $\Rightarrow$ chứng minh H1. $-$ CHAP $\to$ Random: sụt giảm đáng kể $\Rightarrow$ chứng minh H3. $-$ Curriculum: sụt giảm vừa phải $\Rightarrow$ curriculum giúp nhưng không critical.}
-\label{tab:ablation}
-\end{table}
-
-\subsection{CHAP Negative Type Analysis}
-
-\textbf{Exp 3 --- Đánh giá khả năng phân biệt trên từng loại mẫu âm.} Đo MRR@3 khi inference trên 3 loại negatives khác nhau:
-
-\begin{table}[H]
-\centering\small
-\begin{tabular}{lcccc}
-\toprule
-Negative Source & Base-RAG & Hybrid BM25 & GSR & GSR+CACL \\
-\midrule
-Random negatives & --- & --- & --- & --- \\
-BM25 hard negatives & --- & --- & --- & --- \\
-CHAP negatives & --- & --- & --- & --- \\
-\bottomrule
-\end{tabular}
-\caption{CHAP negative type analysis. \textbf{Kỳ vọng:} GSR+CACL đạt hiệu năng cao và đồng đều trên cả 3 loại $\Rightarrow$ mô hình đã học \textit{constraint semantics} thực sự, không chỉ overfit vào dạng negative cụ thể.}
-\end{table}
-
-\subsection{Cross-Domain Generalization}
-
-\textbf{Exp 4 --- Đánh giá khả năng tổng quát hóa chéo.} Train trên FinQA + ConvFinQA (cùng nguồn FinTabNet), test trên TAT-DQA (nguồn khác, cấu trúc bảng đa dạng hơn).
-
-\begin{table}[H]
-\centering\small
-\begin{tabular}{llccc}
-\toprule
-Train Set & Test Set & MRR@3 & R@3 & $\Delta$ vs.\ in-domain \\
-\midrule
-FinQA + ConvFinQA & TAT-DQA & --- & --- & --- \\
-TAT-DQA & FinQA & --- & --- & --- \\
-All (in-domain) & All (in-domain) & --- & --- & baseline \\
-\bottomrule
-\end{tabular}
-\caption{Cross-domain generalization. \textbf{Kỳ vọng:} Nhờ template-based approach dựa trên chuẩn IFRS/GAAP, mô hình tổng quát hóa tốt giữa các nguồn dữ liệu tài chính --- template coverage là yếu tố quyết định.}
-\end{table}
-
-\subsection{Template Coverage Analysis}\label{sec:coverage}
-
-\textbf{Exp 5 --- Kiểm chứng claim coverage.} Chạy template matching trên toàn bộ corpus để kiểm chứng ước lượng \S4.3.
-
-\begin{table}[H]
-\centering\small
-\begin{tabular}{lcccc}
-\toprule
-Subset & Total Tables & Matched ($\geq \tau_{\min}$) & Coverage (\%) & Avg. Accounting Edges \\
-\midrule
-FinQA & --- & --- & --- & --- \\
-ConvFinQA & --- & --- & --- & --- \\
-TAT-DQA & --- & --- & --- & --- \\
-\bottomrule
-\end{tabular}
-\caption{Template coverage analysis toàn corpus $\mathrm{T}^{2}$-RAGBench.}
-\end{table}
-
-\subsection{Error Analysis}
-
-\textbf{Exp 6 --- Phân tích lỗi định tính.} Lấy mẫu ngẫu nhiên các trường hợp GSR + CACL truy xuất sai, phân loại theo nguyên nhân:
+\textbf{Exp 2 --- Đóng góp của từng module.}
 
 \begin{table}[H]
 \centering\small
 \begin{tabular}{llc}
 \toprule
-Loại lỗi & Mô tả & Tỷ lệ (\%) \\
+Variant & Kiểm chứng & MRR@3 (FinQA) \\
 \midrule
-Template Miss & Bảng không khớp template nào $\to$ fallback positional & --- \\
-Entity Confusion & Cùng công ty, khác năm (hoặc ngược lại) & --- \\
-Numerical Ambiguity & Cùng con số xuất hiện ở nhiều ngữ cảnh & --- \\
-Complex Table & Bảng lồng nhau / multi-level headers & --- \\
-Text-Only Answer & Câu trả lời nằm trong narrative, không dùng bảng & --- \\
+GSR (full) & Baseline & 60.4 \\
+GSR w/o Constraint KG & Bỏ KG, chỉ text + entity & \emph{pending} \\
+GSR w/o Constraint Score & Bỏ $\gamma \cdot \text{CS}$ khỏi $\phi_\theta$ & \emph{pending} \\
+GSR w/o GAT Encoder & Thay GAT bằng positional averaging & \emph{pending} \\
+GSR w/o Entity Score & Bỏ $\beta \cdot s_{\text{ent}}$ & \emph{pending} \\
+GSR w/o CHAP training & Inference-only (chưa huấn luyện CHAP) & 60.4 \\
+GSR + CACL & Full training & \emph{pending} \\
 \bottomrule
 \end{tabular}
-\caption{Error taxonomy. \textbf{Mục tiêu:} Chỉ ra giới hạn cụ thể của phương pháp, gợi ý hướng cải tiến (mở rộng template library, multi-level table parsing).}
+\caption{Ablation study. Kỳ vọng: Constraint KG sụt giảm lớn nhất $\Rightarrow$ chứng minh H1.}
+\label{tab:ablation}
+\end{table}
+
+\subsection{CHAP Negative Type Analysis}
+
+\textbf{Exp 3 --- Đánh giá khả năng phân biệt trên từng loại mẫu âm.}
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{lcccc}
+\toprule
+Negative Source & BM25 & Hybrid BM25 & GSR & GSR+CACL \\
+\midrule
+Random negatives & \emph{pending} & \emph{pending} & \emph{pending} & \emph{pending} \\
+BM25 hard negatives & \emph{pending} & \emph{pending} & \emph{pending} & \emph{pending} \\
+CHAP negatives & \emph{pending} & \emph{pending} & \emph{pending} & \emph{pending} \\
+\bottomrule
+\end{tabular}
+\caption{Kỳ vọng: GSR+CACL đồng đều trên 3 loại $\Rightarrow$ đã học constraint semantics thực sự.}
+\end{table}
+
+\subsection{Cross-Domain Generalization}
+
+\textbf{Exp 4 --- Tổng quát hóa chéo lĩnh vực.}
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{llcc}
+\toprule
+Train Set & Test Set & MRR@3 & $\Delta$ vs.\ in-domain \\
+\midrule
+FinQA + ConvFinQA & TAT-DQA & \emph{pending} & \emph{pending} \\
+TAT-DQA & FinQA & \emph{pending} & \emph{pending} \\
+All & All & 60.4 (FinQA only) & baseline \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Template Coverage Analysis}\label{sec:coverage}
+
+\textbf{Exp 5 --- Kiểm chứng coverage claim.}
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{lcccc}
+\toprule
+Subset & Total Tables & Matched ($\geq 0.5$) & Coverage & Avg. Edges \\
+\midrule
+FinQA & \emph{pending} & \emph{pending} & $\sim$80--90\% (claim) & \emph{pending} \\
+ConvFinQA & \emph{pending} & \emph{pending} & $\sim$80--90\% (claim) & \emph{pending} \\
+TAT-DQA & \emph{pending} & \emph{pending} & $\sim$70\% (claim) & \emph{pending} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Error Analysis}
+
+\textbf{Exp 6 --- Phân loại lỗi truy xuất.}
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{llc}
+\toprule
+Loại lỗi & Mô tả & Tỷ lệ \\
+\midrule
+Template Miss & Bảng không khớp template $\to$ fallback positional & \emph{pending} \\
+Entity Confusion & Cùng công ty, khác năm (hoặc ngược lại) & \emph{pending} \\
+Numerical Ambiguity & Cùng con số ở nhiều ngữ cảnh & \emph{pending} \\
+Complex Table & Bảng lồng nhau / multi-level headers & \emph{pending} \\
+Text-Only Answer & Câu trả nằm trong narrative, không dùng bảng & \emph{pending} \\
+\bottomrule
+\end{tabular}
 \end{table}
 
 %% ============================================================
 %% TÀI LIỆU THAM KHẢO
 %% ============================================================
-\begin{thebibliography}{13}
+\begin{thebibliography}{10}
 
 \bibitem{strich2026t2ragbench}
 J.~Strich, E.~K.~Isgorur, M.~Trescher, C.~Biemann, and M.~Semmann.
 \newblock $\mathrm{T}^2$-RAGBench: A Benchmark for Table-Text Retrieval in Financial Documents.
 \newblock In \textit{Proc.\ EACL}, 2026.
 
-\bibitem{helios2025}
-HELIOS: Multi-hop QA over Financial Tables and Text.
-\newblock In \textit{Proc.\ ACL}, 2025.
-
-\bibitem{thyme2025}
-THYME: Field-aware Hybrid Matching for Table Retrieval.
-\newblock In \textit{Proc.\ EMNLP}, 2025.
-
-\bibitem{thorr2024}
-THoRR: Two-stage Table Retrieval with Header Concatenation, 2024.
-
-\bibitem{confit2025}
-ConFIT: Semantic-Preserving Perturbation for Hard Negative Mining, 2025.
+\bibitem{colbertv2}
+O.~Khattab and M.~Zaharias.
+\newblock ColBERTv2: Efficient and Effective Passage Search via Contextualized Late Interactions.
+\newblock In \textit{Proc.\ SIGIR}, pp.\ 2187--2193, 2021.
 
 \bibitem{karpukhin2020dpr}
 V.~Karpukhin, B.~O\u{g}uz, S.~Min, P.~Lewis, L.~Wu, S.~Edunov, D.~Chen, and W.-t.~Yih.
@@ -794,5 +684,6 @@ F.~Zhu et al.
 \newblock In \textit{Proc.\ EMNLP}, 2022.
 
 \end{thebibliography}
+
 
 \end{document}

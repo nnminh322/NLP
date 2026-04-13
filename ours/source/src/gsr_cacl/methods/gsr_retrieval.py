@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import logging
+logger = logging.getLogger(__name__)
 import numpy as np
 import torch
 from tqdm import tqdm
@@ -20,7 +22,8 @@ from gsr_cacl.core import Document
 from gsr_cacl.kg.builder import build_kg_from_markdown
 from gsr_cacl.kg.data_structures import ConstraintKG
 from gsr_cacl.encoders.gat_encoder import GATEncoder
-from gsr_cacl.scoring.constraint_score import compute_constraint_score
+from gsr_cacl.scoring.constraint_score import compute_constraint_score, ConstraintScoringVersion
+from gsr_cacl.encoders.numeric_encoder import build_numeric_encoder
 from gsr_cacl.scoring.joint_scorer import JointScorer
 from gsr_cacl.datasets.gsr_document import extract_table
 
@@ -52,6 +55,9 @@ class GSRRetrieval:
         gat_num_layers: int = 2,
         device: str | None = None,
         checkpoint_path: str | None = None,
+        contr_version: ConstraintScoringVersion = "v1",
+        rel_tol: float = 1e-3,
+        contr1: str = "v1",
     ):
         self.corpus = corpus
         self.embedding_function = embedding_function
@@ -60,6 +66,9 @@ class GSRRetrieval:
         self.beta = beta
         self.gamma = gamma
         self.epsilon = epsilon
+        self.contr_version: ConstraintScoringVersion = contr_version
+        self.rel_tol = rel_tol
+        self.contr1 = contr1
 
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -74,13 +83,18 @@ class GSRRetrieval:
         # Step 2: Constraint KGs for all docs
         self._build_all_kgs()
 
-        # GAT encoder (§4.3)
+        # GAT encoder (§4.3) — with optional numeric encoder version (--contr1)
+        numeric_mod, _ = build_numeric_encoder(self.contr1, self._embed_dim)
         self.gat_encoder = GATEncoder(
             embed_dim=self._embed_dim,
             hidden_dim=gat_hidden_dim,
             num_heads=gat_num_heads,
             num_layers=gat_num_layers,
+            numeric_encoder=numeric_mod,
+            numeric_version=self.contr1,
         ).to(self.device)
+        logger.info(f"Numeric encoder: contr1={self.contr1}, "
+                    f"module={'ScaleAware' if numeric_mod is not None else 'log-scale'}")
 
         # Joint scorer (§4.4)
         self.scorer = JointScorer(
@@ -196,7 +210,8 @@ class GSRRetrieval:
 
             # Constraint score
             cs_result = compute_constraint_score(
-                self.doc_kgs[corpus_idx], epsilon=self.epsilon
+                self.doc_kgs[corpus_idx], epsilon=self.epsilon,
+                version=self.contr_version, relative_tolerance=self.rel_tol,
             )
 
             # Entity matching score

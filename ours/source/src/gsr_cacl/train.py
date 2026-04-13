@@ -43,7 +43,8 @@ from gsr_cacl.training import (
 from gsr_cacl.negative_sampler import CHAPNegativeSampler
 from gsr_cacl.kg import build_constraint_kg
 from gsr_cacl.scoring import JointScorer, compute_constraint_score
-from gsr_cacl.encoders import GATEncoder, TextEncoder
+from gsr_cacl.scoring.constraint_score import ConstraintScoringVersion
+from gsr_cacl.encoders import GATEncoder, TextEncoder, build_numeric_encoder
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -217,6 +218,7 @@ def stage_structural(
     epochs: int = 3,
     lr: float = 1e-4,
     batch_size: int = 8,
+    contr_version: ConstraintScoringVersion = "v1",
 ) -> None:
     """Train KG encoding + constraint scoring calibration.
 
@@ -248,7 +250,7 @@ def stage_structural(
                 kg = build_constraint_kg(sample.positive_context)
                 kg_embed = gat_encoder.encode_graph(kg)
                 kg_embeds.append(kg_embed)
-                cs_results.append(compute_constraint_score(kg))
+                cs_results.append(compute_constraint_score(kg, version=contr_version))
 
             kg_embed_t = torch.stack(kg_embeds)  # [B, hidden_dim]
 
@@ -291,6 +293,7 @@ def stage_joint(
     margin: float = 0.2,
     lambda_constraint: float = 0.5,
     save_path: Path | None = None,
+    contr_version: ConstraintScoringVersion = "v1",
 ) -> None:
     """Full CACL objective with CHAP negatives — end-to-end.
 
@@ -345,7 +348,7 @@ def stage_joint(
 
                 q_meta = _meta_to_tensor(sample, device).unsqueeze(0)
                 d_meta = _meta_to_tensor(sample, device).unsqueeze(0)
-                pos_cs = compute_constraint_score(pos_kg)
+                pos_cs = compute_constraint_score(pos_kg, version=contr_version)
                 pos_cs_feats = scorer.build_constraint_features([pos_cs], device)
 
                 pos_score = scorer(q_emb, pos_d_emb, pos_kg_embed, q_meta, d_meta, pos_cs_feats)
@@ -364,7 +367,7 @@ def stage_joint(
                         neg.table_md[:512]
                     ).unsqueeze(0)
 
-                    neg_cs = compute_constraint_score(neg_kg)
+                    neg_cs = compute_constraint_score(neg_kg, version=contr_version)
                     neg_cs_feats = scorer.build_constraint_features([neg_cs], device)
 
                     neg_score = scorer(q_emb, neg_d_emb, neg_kg_embed, q_meta, d_meta, neg_cs_feats)
@@ -460,6 +463,20 @@ def main() -> None:
     parser.add_argument("--gradient-checkpointing", action="store_true",
                         help="Enable gradient checkpointing to save VRAM")
 
+    # Architecture version flags
+    parser.add_argument(
+        "--contr1", type=str, default="v1", choices=["v1", "v2"],
+        help="Numeric encoding version: v1=log-scale [4 features], v2=ScaleAwareNumericEncoder "
+             "(magnitude bin + mantissa + unit). Default: v1. "
+             "P0 improvement: v2 handles mixed-scale financial tables better."
+    )
+    parser.add_argument(
+        "--contr2", type=str, default="v1", choices=["v1", "v2"],
+        help="Constraint scoring version: v1=fixed epsilon, v2=relative tolerance. Default: v1. "
+             "P2 improvement: v2 scales tolerance with |value|, fixing the bug where "
+             "large-value tables (|v|=1e12) get near-perfect scores for large absolute errors."
+    )
+
     args = parser.parse_args()
 
     # Apply hardware preset if specified
@@ -491,9 +508,13 @@ def main() -> None:
     embed_dim = text_encoder.embed_dim
 
     # Initialize models — dimensions adapt to chosen encoder
+    numeric_mod, _ = build_numeric_encoder(args.contr1, embed_dim)
     gat_encoder = GATEncoder(
         embed_dim=embed_dim, hidden_dim=256, num_heads=4, num_layers=2,
+        numeric_encoder=numeric_mod, numeric_version=args.contr1,
     ).to(device)
+    logger.info(f"Numeric encoder: contr1={args.contr1}, "
+                f"encoder_module={'ScaleAwareNumericEncoder' if numeric_mod is not None else 'log-scale'}")
 
     scorer = JointScorer(
         text_embed_dim=embed_dim, kg_embed_dim=256, entity_feat_dim=3, hidden_dim=64,
@@ -517,7 +538,8 @@ def main() -> None:
 
     if args.stage in ("structural", "all"):
         stage_structural(text_encoder, scorer, gat_encoder, samples, device,
-                         epochs=args.epochs, lr=args.lr, batch_size=args.batch_size)
+                         epochs=args.epochs, lr=args.lr, batch_size=args.batch_size,
+                         contr_version=args.contr2)
 
     if args.stage in ("joint", "all"):
         stage_joint(
@@ -526,7 +548,9 @@ def main() -> None:
             lr=args.lr, margin=args.margin,
             lambda_constraint=args.lambda_constraint,
             save_path=save_path,
+            contr_version=args.contr2,
         )
+    logger.info(f"Constraint scoring version (contr2): {args.contr2}")
 
     save_path.mkdir(parents=True, exist_ok=True)
     torch.save({

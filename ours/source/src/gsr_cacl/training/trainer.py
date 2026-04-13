@@ -19,7 +19,7 @@ from torch.utils.data import DataLoader
 from gsr_cacl.encoders.gat_encoder import GATEncoder
 from gsr_cacl.encoders.text_encoder import TextEncoder
 from gsr_cacl.kg.builder import build_kg_from_markdown
-from gsr_cacl.scoring.constraint_score import compute_constraint_score
+from gsr_cacl.scoring.constraint_score import compute_constraint_score, ConstraintScoringVersion
 from gsr_cacl.scoring.joint_scorer import JointScorer
 from gsr_cacl.negative_sampler.chap import CHAPNegativeSampler, apply_chap_e
 from gsr_cacl.training.losses import CACLLoss
@@ -59,6 +59,8 @@ def train_gsr_cacl(
     margin: float = 0.2,
     lambda_constraint: float = 0.5,
     log_every: int = 100,
+    contr_version: ConstraintScoringVersion = "v1",
+    rel_tol: float = 1e-4,
 ) -> list[TrainingState]:
     """
     Full GSR + CACL joint training loop with end-to-end gradient flow.
@@ -114,7 +116,7 @@ def train_gsr_cacl(
                     dtype=torch.float32, device=device,
                 ).unsqueeze(0)
 
-                pos_cs = compute_constraint_score(pos_kg)
+                pos_cs = compute_constraint_score(pos_kg, version=contr_version, relative_tolerance=rel_tol)
                 pos_cs_feats = scorer.build_constraint_features([pos_cs], device)
 
                 pos_score = scorer(q_emb, pos_d_emb, pos_kg_embed, q_meta, q_meta, pos_cs_feats)
@@ -130,7 +132,7 @@ def train_gsr_cacl(
                     neg_kg_embed = gat_encoder.encode_graph(neg_kg).unsqueeze(0)
                     neg_d_emb = text_encoder.encode_single(neg.table_md[:512]).unsqueeze(0)
 
-                    neg_cs = compute_constraint_score(neg_kg)
+                    neg_cs = compute_constraint_score(neg_kg, version=contr_version, relative_tolerance=rel_tol)
                     neg_cs_feats = scorer.build_constraint_features([neg_cs], device)
 
                     neg_score = scorer(q_emb, neg_d_emb, neg_kg_embed, q_meta, q_meta, neg_cs_feats)

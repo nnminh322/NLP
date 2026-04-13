@@ -174,6 +174,9 @@ def run_gsr_benchmark(
         gat_hidden_dim=gsr_params.get("gat_hidden_dim", 256),
         gat_num_heads=gsr_params.get("gat_num_heads", 4),
         gat_num_layers=gsr_params.get("gat_num_layers", 2),
+        contr_version=gsr_params.get("contr_version", "v1"),
+        rel_tol=gsr_params.get("rel_tol", 1e-3),
+        contr1=gsr_params.get("contr1", "v1"),
     )
 
     # Run retrieval
@@ -282,13 +285,33 @@ def _main_argparse() -> None:
     parser.add_argument("--output-dir", type=str, default=None)
     parser.add_argument("--sample", type=int, default=None,
                         help="Limit number of QA samples (for debugging)")
+    parser.add_argument(
+        "--contr1", type=str, default="v1", choices=["v1", "v2"],
+        help="Numeric encoding version: v1=log-scale [4 features], v2=ScaleAwareNumericEncoder "
+             "(magnitude bin + mantissa + unit). Default: v1."
+    )
+    parser.add_argument(
+        "--contr2", type=str, default="v1", choices=["v1", "v2"],
+        help="Constraint scoring version: v1=fixed epsilon, v2=relative tolerance. Default: v1."
+    )
+    parser.add_argument(
+        "--rel-tol", type=float, default=1e-3,
+        help="Relative tolerance for contr2 (v2 only). Default: 1e-3 (0.1%% relative error)."
+    )
     args = parser.parse_args()
+
+    from gsr_cacl.scoring.constraint_score import ConstraintScoringVersion
 
     ds_cfg = DATASET_CONFIGS.get(args.dataset)
     if ds_cfg is None:
         raise ValueError(f"Unknown dataset: {args.dataset}")
 
     output_dir = Path(args.output_dir) if args.output_dir else None
+    gsr_params = {
+        "contr_version": args.contr2,
+        "rel_tol": args.rel_tol,
+        "contr1": args.contr1,
+    }
     try:
         run_gsr_benchmark(
             mode=args.mode,
@@ -299,6 +322,7 @@ def _main_argparse() -> None:
             device=args.device,
             output_dir=output_dir,
             sample_size=args.sample,
+            gsr_params=gsr_params,
         )
     except Exception as e:
         logger.error(f"Benchmark failed: {e}", exc_info=True)

@@ -69,8 +69,11 @@ class GATEncoder(nn.Module):
 
     Cell embedding (learnable, no external model needed):
         - header_embed: learnable embedding table indexed by header hash
-        - numeric_proj: projects [log|v|, sign, is_zero, mag_bucket] → embed_dim
-        Combined: cell_embed = header_embed + numeric_proj(features)
+        - numeric_proj / numeric_encoder: encodes numeric values
+
+    Numeric encoding versions (--contr1 flag):
+        v1: numeric_proj over [log|v|, sign, is_zero, mag_bucket] → embed_dim
+        v2: ScaleAwareNumericEncoder (magnitude bin + mantissa + unit) → embed_dim
     """
 
     HEADER_BUCKETS = 512
@@ -82,19 +85,28 @@ class GATEncoder(nn.Module):
         num_heads: int = 4,
         num_layers: int = 2,
         dropout: float = 0.1,
+        numeric_encoder: nn.Module | None = None,
+        numeric_version: str = "v1",
     ):
         super().__init__()
         self.embed_dim = embed_dim
         self.hidden_dim = hidden_dim
         self.num_heads = num_heads
         self.num_layers = num_layers
+        self.numeric_version = numeric_version
 
         # Cell embedding components
         self.header_embed = nn.Embedding(self.HEADER_BUCKETS, embed_dim)
+
+        # V1: original log-scale numeric projection
         self.numeric_proj = nn.Sequential(
             nn.Linear(4, embed_dim),
             nn.ReLU(),
         )
+
+        # V2: ScaleAwareNumericEncoder (passed in as module)
+        self.numeric_encoder_module = numeric_encoder
+
         self.cell_norm = nn.LayerNorm(embed_dim)
 
         # Positional encodings for row/col
@@ -118,6 +130,9 @@ class GATEncoder(nn.Module):
         """Build learnable cell embeddings from header text + numeric value.
 
         Returns: [V, embed_dim]
+
+        V1 (default): hash → header_embed + [log|v|, sign, zero, bucket] → numeric_proj
+        V2:           hash → header_embed + ScaleAwareNumericEncoder (magnitude+mantissa+unit)
         """
         V = len(kg.nodes)
 
@@ -128,11 +143,19 @@ class GATEncoder(nn.Module):
         )
         h_embed = self.header_embed(header_indices)  # [V, embed_dim]
 
-        # Numeric features → projection
-        num_feats = torch.stack(
-            [_numeric_features(n.value, device) for n in kg.nodes], dim=0
-        )  # [V, 4]
-        n_embed = self.numeric_proj(num_feats)  # [V, embed_dim]
+        # Numeric features → projection (v1) or ScaleAwareNumericEncoder (v2)
+        if self.numeric_encoder_module is not None:
+            # V2: multi-resolution encoding
+            values = [n.value for n in kg.nodes]
+            headers = [n.header for n in kg.nodes]
+            cell_texts = [n.text for n in kg.nodes]
+            n_embed = self.numeric_encoder_module.forward(values, headers, cell_texts, device)
+        else:
+            # V1: original log-scale encoding
+            num_feats = torch.stack(
+                [_numeric_features(n.value, device) for n in kg.nodes], dim=0
+            )  # [V, 4]
+            n_embed = self.numeric_proj(num_feats)  # [V, embed_dim]
 
         # Combine: additive fusion + layer norm
         cell_embed = self.cell_norm(h_embed + n_embed)
