@@ -1,381 +1,432 @@
-# GSR-CACL: Graph-Structured Retrieval + Constraint-Aware Contrastive Learning
+# GSR-CACL
 
-> **Paper:** Structured Knowledge-Enhanced Retrieval for Financial Documents
-> **Venue:** EMNLP / SIGIR | **Benchmark:** T²-RAGBench (EACL 2026)
+**Graph-Structured Retrieval with Constraint-Aware Contrastive Learning** for financial documents (text + tables).
 
----
-
-## Overview
-
-This is the implementation of **GSR + CACL** — two complementary contributions for
-retrieving financial text+table documents.
-
-### Contributions
-
-| Contribution | Description | Addresses |
-|---|---|---|
-| **C1: GSR** | Graph-Structured Retrieval — constraint KG from IFRS/GAAP templates, GAT encoder, ε-tolerance scoring | Lexical Overlap Illusion, Mathematical Inconsistency |
-| **C2: CACL** | Constraint-Aware Contrastive Learning — CHAP negative generation (additive/scale/entity violations) | Hard Negative Validity (H3), Numerical Density Paradox |
+> **Paper:** *Structured Knowledge-Enhanced Retrieval for Financial Documents* — T²-RAGBench (EACL 2026)
+> **Benchmark:** [G4KMU/t2-ragbench](https://huggingface.co/datasets/G4KMU/t2-ragbench) (23,088 QA pairs, 7,318 documents)
 
 ---
 
-## Cloud Setup (Kaggle / Google Colab)
+## Table of Contents
 
-### Option A: Google Colab (T4 free / A100 Pro)
+1. [Quick Start](#1-quick-start)
+2. [Installation](#2-installation)
+3. [Architecture Overview](#3-architecture-overview)
+4. [Three Contributions](#4-three-contributions)
+5. [Training](#5-training)
+6. [Benchmarking](#6-benchmarking)
+7. [Codebase Map](#7-codebase-map)
+8. [Extending Templates](#8-extending-templates)
+
+---
+
+## 1. Quick Start
+
+### Run on Google Colab / Kaggle (T4 GPU — free)
 
 ```python
 # Cell 1: Clone
 !git clone https://github.com/<YOUR_REPO>/gsr-cacl.git /content/gsr-cacl
+!cd /content/gsr-cacl/ours/source
 
-# Cell 2: Change directory and install
-import os
-os.chdir("/content/gsr-cacl/ours/source")
-# NOTE: faiss-gpu from PyPI only supports Python ≤3.10.
-# Colab uses Python 3.10+ so we use faiss-cpu; GPU vectors are handled via torch.
+# Cell 2: Install
 !pip install -e ".[dev]" --quiet
 !pip install peft accelerate transformers faiss-cpu --quiet
 
-# Cell 3: Verify GPU
-import torch
-print(f"Python: {torch.__version__}")
-print(f"GPU: {torch.cuda.get_device_name(0)}")
-print(f"VRAM: {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB")
-
-# Cell 4: Train — choose preset by available VRAM
-# T4 16GB: LoRA + bge-large + gradient checkpointing
-!python -m gsr_cacl.train --dataset finqa --stage all --preset t4 --gradient-checkpointing
-
-# Cell 5: Benchmark
-!python -m gsr_cacl.benchmark_gsr --mode gsr --dataset finqa --top-k 3
-```
-
-### Option B: Kaggle Notebook (T4 GPU, 16GB VRAM — Free)
-
-```python
-# Cell 1: Clone & Install
-!git clone https://github.com/<YOUR_REPO>/gsr-cacl.git /kaggle/working/gsr-cacl
-
-# Cell 2: Change directory and install
-import os
-os.chdir("/kaggle/working/gsr-cacl/ours/source")
-!pip install -e ".[dev]" --quiet
-!pip install peft accelerate transformers faiss-cpu --quiet
-
-# Cell 3: Verify GPU
-import torch
-print(f"GPU: {torch.cuda.get_device_name(0)}")
-print(f"VRAM: {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB")
-
-# Cell 4: Train (LoRA on T4 — recommended for 16GB VRAM)
+# Cell 3: Train (LoRA on T4 — fits 16GB VRAM)
 !python -m gsr_cacl.train \
     --dataset finqa \
     --stage all \
-    --epochs 5 \
     --preset t4 \
-    --gradient-checkpointing \
-    --save /kaggle/working/outputs
+    --gradient-checkpointing
 
-# Cell 5: Benchmark
-!python -m gsr_cacl.benchmark_gsr --mode gsr --dataset finqa --top-k 3
+# Cell 4: Benchmark
+!python -m gsr_cacl.benchmark_gsr \
+    --mode gsr \
+    --dataset finqa \
+    --contr1 v2 \
+    --contr2 v2
 ```
 
-### Hardware Presets
+### Local installation
 
-| Preset | Encoder | Fine-tune | Batch | VRAM | Trainable Params |
-|--------|---------|-----------|-------|------|-----------------|
-| `t4`   | bge-large (335M) | LoRA r=16 | 8 | ~12 GB | ~5.4M |
-| `a100` | bge-large (335M) | Full | 16 | ~20 GB | ~336M |
-| `v100` | bge-base (110M)  | Full | 16 | ~14 GB | ~111M |
-| `cpu`  | bge-base (110M)  | Frozen | 4 | — | ~1.3M |
+```bash
+cd ours/source
+pip install -e ".[dev]"
+pip install peft accelerate transformers faiss-cpu
 
-### VRAM Estimation
+# Train
+python -m gsr_cacl.train --dataset finqa --stage all --preset t4
 
-| Config | Model | Fine-tune | Batch=8 | Batch=16 |
-|--------|-------|-----------|---------|----------|
-| bge-base + LoRA | 110M | LoRA r=16 | ~6 GB | ~8 GB |
-| bge-large + LoRA | 335M | LoRA r=16 | ~10 GB | ~14 GB |
-| bge-large + Full | 335M | Full | ~14 GB | ~20 GB |
-| e5-large + LoRA | 560M | LoRA r=16 | ~14 GB | ~20 GB |
+# Benchmark
+python -m gsr_cacl.benchmark_gsr --mode gsr --dataset finqa
+```
+
+### Hardware presets
+
+| Preset | Encoder | Fine-tune | Batch | VRAM | Use case |
+|--------|---------|-----------|-------|------|----------|
+| `t4` | bge-large (335M) | LoRA r=16 | 8 | ~12 GB | Colab / Kaggle free |
+| `a100` | bge-large (335M) | Full | 16 | ~20 GB | Full fine-tune |
+| `v100` | bge-base (110M) | Full | 16 | ~14 GB | Mid-range GPU |
+| `cpu` | bge-base (110M) | Frozen | 4 | — | Debugging only |
 
 > **Tip:** Add `--gradient-checkpointing` to halve activation memory at ~20% speed cost.
 
 ---
 
-## Local Installation
+## 2. Installation
 
-```bash
-# Using conda
-conda activate master
+### Requirements
 
-# Install package (use .[dev] — faiss-cpu is always installed; GPU vectors use torch)
-cd /project/ours/source
-pip install -e ".[dev]"
-
-# For LoRA fine-tuning
-pip install peft accelerate transformers faiss-cpu
-
-# Verify
-python -c "import gsr_cacl; print(gsr_cacl.__version__)"
-```
+- Python 3.10+
+- PyTorch 2.0+
+- CUDA-capable GPU (recommended for training)
 
 ### Dependencies
 
 ```
 torch>=2.0.0
 transformers>=4.36.0, peft>=0.7.0, accelerate>=0.25.0
-langchain-core, langchain-huggingface, langchain-community
-rank-bm25, faiss-cpu (or faiss-gpu)
-datasets, pandas, tqdm, hydra-core, omegaconf
+langchain-huggingface, langchain-community
+rank-bm25, faiss-cpu
+datasets, pandas, tqdm
+hydra-core, omegaconf
+```
+
+### Full install
+
+```bash
+# From project root
+cd ours/source
+pip install -e ".[dev]"           # dev includes pytest, ruff, mypy
+pip install -e ".[gpu]"           # GPU acceleration (optional)
+pip install peft accelerate transformers faiss-cpu  # ML dependencies
+```
+
+### Verify installation
+
+```bash
+python -c "from gsr_cacl import GATEncoder, JointScorer; print('OK')"
 ```
 
 ---
 
-## Quick Start
+## 3. Architecture Overview
 
-### 1. Train GSR + CACL (end-to-end)
+GSR-CACL solves the problem: *retrieve the correct financial document given a question* from a corpus of mixed text+table reports.
+
+### Pipeline
+
+```
+Question Q
+    │
+    ├── 1. FAISS Vector Search ──→ Candidate top-4K documents
+    │       (text similarity: BGE cosine)
+    │
+    ├── 2. Extract Table + Build KG
+    │       markdown table ──parse──► Cell nodes (value, header, position)
+    │                              │
+    │                              └──► Template Matching (15 IFRS/GAAP patterns)
+    │                                    │
+    │                                    └──► Accounting edges (ω = +1/−1/0)
+    │                                          +1 = additive parent (e.g., Revenue + COGS → Gross Profit)
+    │                                          −1 = subtractive parent (e.g., GP − OpEx → EBIT)
+    │                                           0 = positional (same row/col)
+    │
+    ├── 3. Encode with GAT ──→ Graph embedding d_KG
+    │       (2-layer, 4-head, edge-aware attention)
+    │
+    └── 4. Joint Scoring
+            s(Q,D) = α·s_text + β·s_entity + γ·CS(G_D)
+                │
+                ├── s_text: cosine(BGE(Q), BGE(D)) × query_gate + kg_adjustment
+                ├── s_entity: cosine(e_Q, e_D)  ← learned entity embeddings
+                └── CS(G_D): constraint score  (ε-tolerance accounting equations)
+```
+
+### Three signals
+
+| Signal | Source | What it measures |
+|--------|-------|----------------|
+| **s_text** | BGE encoder | Lexical/semantic relevance |
+| **s_entity** | EntityEncoder | Company/year/sector match (learned) |
+| **CS(G_D)** | Constraint KG | Mathematical validity of the table |
+
+---
+
+## 4. Three Contributions
+
+### C1 — GSR: Graph-Structured Table Representation
+
+**Problem:** Flattening a table into text destroys accounting structure. A cell "500" loses: which column? Which row? What equation does it participate in?
+
+**Solution:** Parse the table into a constraint knowledge graph.
+
+```
+| Revenue | COGS | Gross Profit |
+| 100,000 | 70,000| 30,000      |
+
+         ┌─[ω=−1]── Revenue
+Revenue ─┼─[ω=+1]── COGS
+         └─[ω=+1]── Gross Profit  (Σ Revenue − COGS = GP)
+```
+
+- 15 IFRS/GAAP templates cover ~80–90% of financial tables
+- Edge weights ω ∈ {+1, −1, 0} encode accounting semantics
+- GAT encoder learns structural representations from the graph
+
+**Key equation:**
+```
+h_v^{(l+1)} = W_o [ ⊕_k Σ α_{uv} · ω_{uv} · W_v h_u^{(l)} ] + h_v^{(l)}
+```
+
+### C2 — EntitySupConLoss: Entity Understanding
+
+**Problem:** Exact match ("Apple" vs "Apple Inc." → score=0) has zero gradient. The encoder learns nothing from entity matching.
+
+**Solution:** Supervised Contrastive Learning with a shared BGE backbone.
+
+```
+Apple → BGE → [CLS] ──┐
+Apple Inc. → BGE → [CLS] ──┼── concat ── proj ── LayerNorm → e ∈ R²⁵⁶
+AAPL → BGE → [CLS] ──┘
+
+L = −log ( Σ_{j∈P(i)} exp(cos(z_i, z_j)/τ) )
+                    --------------------------------
+                    Σ_k exp(cos(z_i, z_k)/τ)
+```
+
+- Same entity (Apple, Apple Inc., AAPL) → embeddings cluster together
+- Different entities (Apple vs Microsoft) → embeddings far apart
+- Gradient flows back through shared BGE → improves both entity AND text embeddings
+
+**Key innovation:** Entity understanding improves text retrieval because the same backbone learns both.
+
+### C3 — CHAP: Constraint-Aware Hard Negatives
+
+**Problem:** Random negatives are too easy (completely unrelated). BM25 negatives only capture lexical overlap. Neither tests whether the model understands accounting.
+
+**Solution:** Break exactly ONE accounting equation to create a hard negative.
+
+| Type | What it does | Example |
+|------|-------------|---------|
+| **CHAP-A** | Change one LHS cell | Revenue=100K→110K (GP no longer = Revenue−COGS) |
+| **CHAP-S** | Change unit (M↔B) | Revenue=100M→0.1B (ratio broken) |
+| **CHAP-E** | Swap company/year | Table for Apple, metadata says Microsoft |
+
+**Zero-Sum property:** The negative differs from the positive in exactly ONE way → surface similarity stays high, but an accounting constraint is violated. This forces the model to learn constraint semantics, not just lexical overlap.
+
+---
+
+## 5. Training
+
+### Three-Stage Curriculum
+
+Training follows a curriculum from simple to complex:
+
+```
+Stage 1 — Identity
+    Objective: Learn (Company, Year) discrimination via entity scoring
+    Loss: TripletLoss + EntitySupConLoss
+    Duration: 3 epochs
+    Modules: EntityEncoder + TextEncoder + JointScorer
+    ─────────────────────────────────────────────────────
+Stage 2 — Structural
+    Objective: Calibrate KG encoding + constraint score ≈ 1.0 for valid tables
+    Loss: MSE(CS(G_D), 1.0)
+    Duration: 3 epochs
+    Modules: + GATEncoder
+    ─────────────────────────────────────────────────────
+Stage 3 — Joint (CACL)
+    Objective: Full CACL with CHAP hard negatives
+    Loss: L_total = L_triplet + λ_e · L_EntitySupCon + λ_c · L_constraint
+    Duration: 5 epochs
+    Modules: All
+```
+
+**Why Stage 1 first?** Entity embeddings must learn basic clustering structure before GAT can use them in attention (EntitySim term). If entity embeddings are random, EntitySim in GAT is noise, not signal.
+
+### Full training command
 
 ```bash
-# Recommended: LoRA fine-tuning with bge-large (fits T4 16GB)
 python -m gsr_cacl.train \
     --dataset finqa \
     --stage all \
     --encoder BAAI/bge-large-en-v1.5 \
     --finetune lora \
     --epochs 5 \
-    --batch-size 8
+    --batch-size 8 \
+    --contr1 v2 \
+    --contr2 v2 \
+    --save ./outputs/gsr_training
+```
 
-# Full fine-tuning on A100 (maximum benchmark performance)
-python -m gsr_cacl.train \
-    --dataset finqa \
-    --stage all \
-    --encoder BAAI/bge-large-en-v1.5 \
-    --finetune full \
-    --epochs 5 \
-    --batch-size 16
+### Standalone stages
 
-# Stage-by-stage training
+```bash
 python -m gsr_cacl.train --dataset finqa --stage identity --epochs 3
 python -m gsr_cacl.train --dataset finqa --stage structural --epochs 3
-python -m gsr_cacl.train --dataset finqa --stage joint --epochs 5
+python -m gsr_cacl.train --dataset finqa --stage joint --epochs 5 --save ./checkpoints
 ```
 
-### 2. Run GSR Retrieval Benchmark
+### Loading a checkpoint
+
+```python
+from gsr_cacl.encoders import TextEncoder, GATEncoder
+from gsr_cacl.scoring import JointScorer
+
+ckpt = torch.load("./outputs/gsr_training/final_model.pt")
+text_encoder.load_state_dict(ckpt["text_encoder_state"])
+gat_encoder.load_state_dict(ckpt["gat_encoder_state"])
+scorer.load_state_dict(ckpt["scorer_state"])
+```
+
+---
+
+## 6. Benchmarking
+
+### Run retrieval benchmark
 
 ```bash
-# On FinQA
+# Basic GSR
 python -m gsr_cacl.benchmark_gsr --mode gsr --dataset finqa --top-k 3
 
-# On TAT-DQA (diverse tables)
-python -m gsr_cacl.benchmark_gsr --mode gsr --dataset tatqa --top-k 3
-
-# Hybrid GSR + BM25
+# Hybrid GSR + BM25 with RRF
 python -m gsr_cacl.benchmark_gsr --mode hybridgsr --dataset finqa --top-k 3
+
+# Sample for quick testing
+python -m gsr_cacl.benchmark_gsr --mode gsr --dataset finqa --sample 50
+
+# Use ScaleAwareNumericEncoder (contr1=v2) + relative tolerance (contr2=v2)
+python -m gsr_cacl.benchmark_gsr --mode gsr --dataset finqa --contr1 v2 --contr2 v2
 ```
 
-### 3. Compare with Baselines
-
-```bash
-python -m gsr_cacl.evaluate_comparison --dataset finqa --methods gsr hybridgsr --save results.csv
-```
-
----
-
-## Architecture
-
-```
-Query Q
-  ├─► Metadata extraction (company, year, sector)
-  ├─► Table KG Construction
-  │     markdown table ──parse──► Cell nodes
-  │                          │
-  │                          └──► Template Matching (15 IFRS/GAAP patterns)
-  │                                │
-  │                                └──► Accounting edges (ω ∈ {+1,−1,0})
-  │                                      │
-  │                                      └──► Fallback: positional graph
-  │
-  └─► Joint Scoring:
-        s(Q,D) = α·sim_text(Q,D)
-               + β·sim_entity(Q,G_D)
-               + γ·ConstraintScore(G_D, Q)
-             └─ ε-tolerance: exp(−|ω·v_u − v_v| / max(|v_v|, ε))
-```
-
----
-
-## Key Components
-
-### `gsr_cacl/templates/` — IFRS/GAAP Template Library
-15 accounting templates covering ~80-90% of financial tables:
-- Income Statement (Revenue → COGS → Gross Profit → Net Income)
-- Balance Sheet (Assets = Liabilities + Equity)
-- Cash Flow, Revenue by Segment, EPS, EBITDA, Ratios, ...
-
-### `gsr_cacl/kg/` — Knowledge Graph Construction
-- `build_constraint_kg()`: Parse markdown → nodes + edges
-- `build_kg_from_markdown()`: One-shot KG from table string
-- Support for additive (ω=+1), subtractive (ω=−1), positional (ω=0) edges
-
-### `gsr_cacl/encoders/` — GAT Encoder
-- Edge-aware message passing with ω-weighted attention
-- 2-layer GAT with sinusoidal positional encoding for row/col indices
-
-### `gsr_cacl/scoring/` — Constraint-Aware Scoring
-- `compute_constraint_score()`: ε-tolerance differentiable scoring
-- `compute_entity_score()`: Company + year + sector matching
-- `JointScorer`: Learnable α, β, γ weights
-
-### `gsr_cacl/negative_sampler/` — CHAP Negative Generator
-Three types, all satisfying Zero-Sum property:
-- **CHAP-A**: Additive violation (change 1 cell → equation broken)
-- **CHAP-S**: Scale violation (M → B, ratio broken)
-- **CHAP-E**: Entity/year swap (same structure, wrong entity)
-
-### `gsr_cacl/training/` — Joint Training
-- `TripletLoss`: Margin-based contrastive loss
-- `ConstraintViolationLoss`: Penalises scoring constraint-violating negatives high
-- `CACLLoss`: L = L_triplet + λ · L_constraint
-
-### `gsr_cacl/methods/` — RAG Methods
-- `GSRRetrieval`: Full GSR pipeline with joint scoring
-- `HybridGSR`: GSR + BM25 with RRF fusion
-
----
-
-## Trainable Parameters Summary
-
-| Component | Params | Frozen mode | LoRA mode | Full mode |
-|-----------|--------|-------------|-----------|-----------|
-| **TextEncoder** (bge-large) | 335M | Frozen | ~4.2M trainable | 335M trainable |
-| **GATEncoder** | 1.22M | Trainable | Trainable | Trainable |
-| **JointScorer** | 66.8K | Trainable | Trainable | Trainable |
-| **Total trainable** | — | **1.29M** | **~5.5M** | **~336M** |
-
-## Computational Cost
-
-| Component | Complexity | Notes |
-|---|---|---|
-| KG Construction | O(n_cells) | ~57 cells avg (TAT-DQA), regex-based |
-| GAT Encoding | O(V·E) | V≈57, E≈5-10, sparse attention |
-| Constraint Scoring | O(E_c) | E_c≈5-10, constant time |
-| Text Encoding (forward) | O(seq_len²·d) | Standard transformer, max_len=512 |
-| **Total inference** | **~1.2–1.4× baseline** | Pre-indexed KG construction |
-| CHAP Generation | O(n_cells) | Offline pre-generation, zero runtime cost |
-
----
-
-## Expected Results
-
-Based on T²-RAGBench reported baselines:
+### Expected results (on T²-RAGBench)
 
 | Method | MRR@3 | Recall@3 |
-|---|---|---|
-| BM25 | 0.280 | 0.36 |
-| Hybrid BM25 | 0.352 | 0.45 |
-| ColBERTv2 | 0.310 | 0.40 |
+|--------|-------|---------|
+| Base-RAG (BGE dense) | 0.326 | 0.398 |
+| Hybrid BM25 | 0.352 | 0.494 |
 | **GSR (ours)** | **≥ 0.40** | **≥ 0.50** |
 | **HybridGSR (ours)** | **≥ 0.42** | **≥ 0.52** |
 
-GSR targets: outperform HybridBM25 by capturing accounting identities that
-lexical/dense methods miss.
+### Compare with baselines
 
----
-
-## File Structure
-
+```bash
+python -m gsr_cacl.evaluate_comparison \
+    --dataset finqa \
+    --methods gsr hybridgsr \
+    --save results.csv
 ```
-ours/source/
-├── pyproject.toml
-├── README.md
-├── Makefile
-├── conf/
-│   └── dataset/
-│       ├── gsr_finqa.yaml
-│       └── gsr_tatqa.yaml
-└── src/
-    └── gsr_cacl/
-        ├── __init__.py
-        ├── benchmark_gsr.py          ← Main benchmark entry point
-        ├── evaluate.py               ← CLI entry
-        ├── evaluate_comparison.py     ← Baseline comparison
-        ├── train.py                   ← Joint training script
-        ├── template_coverage_analysis.py
-        │
-        ├── core/                      ← Core data structures
-        │   └── __init__.py            Document, RetrievalResult, DatasetSplit
-        │
-        ├── templates/                 ← IFRS/GAAP template library
-        │   ├── __init__.py            (re-exports)
-        │   ├── data_structures.py     AccountingConstraint, AccountingTemplate
-        │   ├── library.py             15 templates + TEMPLATE_REGISTRY
-        │   └── matching.py            match_template(), normalize_header()
-        │
-        ├── kg/                        ← Constraint KG construction
-        │   ├── __init__.py            (re-exports)
-        │   ├── data_structures.py     KGNode, KGEdge, ConstraintKG
-        │   ├── parser.py              parse_markdown_rows(), parse_number()
-        │   └── builder.py             build_constraint_kg(), build_kg_from_markdown()
-        │
-        ├── encoders/                  ← GAT graph encoder
-        │   ├── __init__.py            (re-exports)
-        │   ├── positional.py          SinusoidalPositionalEncoding
-        │   ├── gat_layer.py           GATLayer (edge-aware attention)
-        │   └── gat_encoder.py         GATEncoder (2-layer, 4-head)
-        │
-        ├── scoring/                   ← Constraint-aware scoring
-        │   ├── __init__.py            (re-exports)
-        │   ├── constraint_score.py    compute_constraint_score(), compute_entity_score()
-        │   └── joint_scorer.py        JointScorer (learnable α, β, γ)
-        │
-        ├── negative_sampler/          ← CHAP negative generation
-        │   ├── __init__.py            (re-exports)
-        │   └── chap.py               CHAPNegativeSampler, apply_chap_{a,s,e}
-        │
-        ├── training/                  ← CACL training loop
-        │   ├── __init__.py            (re-exports)
-        │   ├── losses.py              TripletLoss, ConstraintViolationLoss, CACLLoss
-        │   ├── data.py                RetrievalSample, RetrievalDataset
-        │   └── trainer.py             train_gsr_cacl()
-        │
-        ├── methods/                   ← GSR RAG methods
-        │   ├── __init__.py            (re-exports)
-        │   └── gsr_retrieval.py       GSRRetrieval, HybridGSR
-        │
-        └── datasets/                  ← Dataset loading (HuggingFace)
-            ├── __init__.py            (re-exports)
-            ├── gsr_document.py        GSRDocument, extract_table()
-            └── wrappers.py            load_t2ragbench_split(), build_gsr_corpus()
+
+### Template coverage analysis
+
+```bash
+python -m gsr_cacl.template_coverage_analysis --dataset finqa --sample 300
+python -m gsr_cacl.template_coverage_analysis --dataset tatqa --sample 300
 ```
 
 ---
 
-## Baselines for Comparison
+## 7. Codebase Map
 
-| Method | Source | Priority |
-|---|---|---|
-| HELIOS (ACL 2025) | Multi-granular table-text retrieval | 🔴 Critical |
-| THYME (EMNLP 2025) | Field-aware hybrid matching | 🔴 Critical |
-| THoRR (2024) | Two-stage table retrieval | 🔴 Critical |
-| HybridBM25 | T²-RAGBench best reported | ✅ Baseline |
-| ColBERT-v2 | Late interaction baseline | ✅ Baseline |
+```
+ours/source/src/gsr_cacl/
+├── __init__.py
+├── train.py                         ← Training CLI entry point
+├── benchmark_gsr.py                 ← Benchmark CLI entry point
+├── evaluate.py
+├── evaluate_comparison.py
+├── template_coverage_analysis.py
+│
+├── core/
+│   └── __init__.py                 ← Document, RetrievalResult, DatasetSplit
+│
+├── encoders/
+│   ├── text_encoder.py              ← Differentiable BGE encoder (LoRA/freeze/full)
+│   ├── entity_encoder.py           ← EntityEncoder + SharedEncoder (NEW)
+│   ├── gat_layer.py                 ← Edge-aware GAT + EntitySim + residual (FIXED)
+│   ├── gat_encoder.py               ← 2-layer GAT encoder (FIXED)
+│   ├── numeric_encoder.py           ← V1 (log-scale) + V2 (ScaleAware)
+│   └── positional.py                ← Sinusoidal PE for row/col
+│
+├── kg/
+│   ├── builder.py                   ← Template matching + KG construction
+│   ├── data_structures.py          ← KGNode, KGEdge, ConstraintKG
+│   └── parser.py                   ← Markdown table parser
+│
+├── scoring/
+│   ├── constraint_score.py          ← V1 (fixed ε) + V2 (relative tolerance)
+│   └── joint_scorer.py             ← JointScorer (learned s_ent) (FIXED)
+│
+├── negative_sampler/
+│   └── chap.py                     ← CHAP-A / CHAP-S / CHAP-E negatives
+│
+├── training/
+│   ├── losses.py                   ← TripletLoss, ConstraintViolationLoss, CACLLoss
+│   ├── entity_supcon_loss.py        ← EntitySupConLoss + EntityRegistry (NEW)
+│   ├── data.py                     ← RetrievalSample, RetrievalDataset
+│   └── trainer.py                   ← train_gsr_cacl() function
+│
+├── methods/
+│   └── gsr_retrieval.py            ← GSRRetrieval + HybridGSR
+│
+├── templates/
+│   ├── library.py                   ← 15 IFRS/GAAP templates
+│   ├── data_structures.py          ← AccountingTemplate, AccountingConstraint
+│   └── matching.py                 ← Template matching + header normalization
+│
+└── datasets/
+    ├── wrappers.py                 ← load_t2ragbench_split(), build_gsr_corpus()
+    └── gsr_document.py             ← GSRDocument with pre-computed KG
+```
 
 ---
 
-## Extending to New Domains
+## 8. Extending Templates
 
-The template library (`gsr_cacl/templates/`) is domain-specific.
-To extend to new domains:
+The template library is domain-specific (IFRS/GAAP financial tables). To add a new template:
 
-1. Add domain-specific accounting identities to `TEMPLATES`
-2. Update `_HEADER_SYNONYMS` with domain vocabulary
-3. Adjust `epsilon` tolerance for domain numerical precision
+**Step 1:** Add to `templates/library.py`:
+
+```python
+from gsr_cacl.templates.data_structures import AccountingTemplate, AccountingConstraint
+
+_register(AccountingTemplate(
+    name="my_template",
+    description="Description of the accounting identity",
+    headers=["Header1", "Header2", "Total"],
+    constraints=[
+        AccountingConstraint(
+            name="my_constraint",
+            lhs=["Header1", "Header2"],
+            rhs="Total",
+            omega=+1,  # +1 = additive, −1 = subtractive
+            op="add",  # "add" | "sub" | "div"
+        ),
+    ],
+))
+```
+
+**Step 2:** Add synonyms to `templates/matching.py`:
+
+```python
+_HEADER_SYNONYMS["my_header_variant"] = "Header1"
+```
+
+**Step 3:** Verify coverage:
+
+```bash
+python -m gsr_cacl.template_coverage_analysis --dataset finqa --sample 300
+```
 
 ---
 
-## References
+## Key References
 
-- Strich et al. (EACL 2026): T²-RAGBench
+- Strich et al. (EACL 2026): [T²-RAGBench](https://huggingface.co/datasets/G4KMU/t2-ragbench)
+- Khosla et al. (NeurIPS 2020): Supervised Contrastive Learning
 - Halliday (1994): An Introduction to Functional Grammar
 - Shannon (1948): A Mathematical Theory of Communication
-- Singh & Gupta (NAACL 2023): Constraint-guided accounting KG
-- ConFIT (Agents4Science 2025): Semantic-Preserving Perturbation (cf. CHAP differentiation)
+- Karpukhin et al. (EMNLP 2020): Dense Passage Retrieval (DPR)

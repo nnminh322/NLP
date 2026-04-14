@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GSR-CACL Architecture — Figure 1</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --panel-bg: #f8f9fa;
+    --border: #dee2e6;
+    --text: #1a1a2e;
+    --text-muted: #6c757d;
+    --accent-blue: #3b82f6;
+    --accent-purple: #8b5cf6;
+    --accent-green: #10b981;
+    --accent-orange: #f59e0b;
+    --accent-red: #ef4444;
+    --contrib1: #2563eb;
+    --contrib2: #7c3aed;
+    --contrib3: #059669;
+    --loss-color: #dc2626;
+    --font-main: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font-math: 'Cambria Math', 'STIX Two Text', Georgia, serif;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    font-family: var(--font-main);
+    color: var(--text);
+    line-height: 1.5;
+    padding: 32px;
+  }
+
+  figure {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  figcaption {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 16px;
+    font-style: italic;
+  }
+
+  .arch-container {
+    position: relative;
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 32px 24px;
+    overflow: hidden;
+  }
+
+  .arch-title {
+    text-align: center;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    margin-bottom: 24px;
+    color: var(--text);
+  }
+
+  .arch-title span {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-muted);
+    display: block;
+    margin-top: 2px;
+  }
+
+  /* SVG Overlay for arrows */
+  .arrows-svg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  /* Grid Layout */
+  .grid {
+    display: grid;
+    grid-template-columns: 160px 220px 1fr 220px 160px;
+    grid-template-rows: auto;
+    gap: 0 12px;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Columns */
+  .col-input { grid-column: 1; }
+  .col-text  { grid-column: 2; }
+  .col-center { grid-column: 3; }
+  .col-scorer { grid-column: 4; }
+  .col-output { grid-column: 5; }
+
+  /* Rows for center section */
+  .row-doc   { grid-row: 1; }
+  .row-query { grid-row: 2; }
+  .row-meta  { grid-row: 3; }
+  .row-table { grid-row: 4; }
+  .row-kg    { grid-row: 5; }
+  .row-chap  { grid-row: 6; }
+
+  .spacer-row { grid-row: span 6; }
+
+  /* Input boxes */
+  .box {
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    line-height: 1.4;
+    text-align: center;
+    position: relative;
+  }
+
+  .box-doc {
+    background: #eff6ff;
+    border: 1.5px solid #bfdbfe;
+    color: #1e40af;
+  }
+
+  .box-query {
+    background: #faf5ff;
+    border: 1.5px solid #e9d5ff;
+    color: #6d28d9;
+  }
+
+  .box-meta {
+    background: #f0fdf4;
+    border: 1.5px solid #bbf7d0;
+    color: #15803d;
+  }
+
+  .box-table {
+    background: #fffbeb;
+    border: 1.5px solid #fde68a;
+    color: #92400e;
+  }
+
+  .box-label {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.7;
+    margin-bottom: 4px;
+  }
+
+  .box-val {
+    font-family: var(--font-main);
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  /* Encoder boxes */
+  .encoder-box {
+    background: white;
+    border-radius: 10px;
+    padding: 14px 12px;
+    text-align: center;
+    box-shadow: var(--shadow-md);
+    position: relative;
+    transition: box-shadow 0.2s;
+  }
+
+  .encoder-box:hover {
+    box-shadow: var(--shadow-lg);
+  }
+
+  .encoder-box .box-label {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.6;
+    margin-bottom: 6px;
+  }
+
+  .encoder-name {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .encoder-sub {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .encoder-detail {
+    font-size: 10px;
+    color: var(--text-muted);
+    background: var(--panel-bg);
+    border-radius: 4px;
+    padding: 4px 6px;
+    font-family: 'Courier New', monospace;
+  }
+
+  .text-encoder .encoder-name { color: var(--accent-blue); }
+  .text-encoder { border: 2px solid var(--accent-blue); }
+  .text-encoder .contrib-tag { background: #dbeafe; color: #1e40af; }
+
+  .entity-encoder .encoder-name { color: var(--contrib2); }
+  .entity-encoder { border: 2px solid var(--contrib2); }
+  .entity-encoder .contrib-tag { background: #ede9fe; color: #6d28d9; }
+
+  .gat-encoder .encoder-name { color: var(--contrib1); }
+  .gat-encoder { border: 2px solid var(--contrib1); }
+  .gat-encoder .contrib-tag { background: #dbeafe; color: #1e40af; }
+
+  .template-box {
+    background: #fffbeb;
+    border: 1.5px solid #fde68a;
+    border-radius: 8px;
+    padding: 10px 12px;
+    text-align: center;
+    font-size: 11px;
+    color: #92400e;
+    font-weight: 600;
+  }
+
+  .scorer-box {
+    background: white;
+    border-radius: 10px;
+    padding: 14px 12px;
+    text-align: center;
+    box-shadow: var(--shadow-md);
+    border: 2px solid var(--contrib3);
+    position: relative;
+  }
+
+  .scorer-box .box-label {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.6;
+    margin-bottom: 6px;
+  }
+
+  .scorer-name { font-size: 13px; font-weight: 700; color: var(--contrib3); margin-bottom: 6px; }
+
+  .scorer-inputs {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+
+  .scorer-input-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  .scorer-input-row .arrow-in {
+    color: var(--accent-blue);
+    font-weight: 700;
+  }
+
+  .contrib-tag {
+    display: inline-block;
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    padding: 2px 5px;
+    border-radius: 3px;
+    margin-bottom: 4px;
+  }
+
+  /* Output */
+  .output-box {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    border: 2px solid var(--accent-green);
+    border-radius: 10px;
+    padding: 14px 12px;
+    text-align: center;
+    box-shadow: var(--shadow-md);
+  }
+
+  .output-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: #15803d;
+    margin-bottom: 4px;
+  }
+
+  .output-formula {
+    font-family: var(--font-math);
+    font-size: 11px;
+    color: #166534;
+    background: #dcfce7;
+    border-radius: 4px;
+    padding: 4px 8px;
+    display: inline-block;
+  }
+
+  /* Training / Loss section */
+  .loss-section {
+    margin-top: 24px;
+    border-top: 1.5px dashed var(--border);
+    padding-top: 20px;
+  }
+
+  .loss-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--loss-color);
+    margin-bottom: 12px;
+    text-align: center;
+  }
+
+  .loss-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+
+  .loss-box {
+    background: #fef2f2;
+    border: 1.5px solid #fecaca;
+    border-radius: 8px;
+    padding: 10px 12px;
+    text-align: center;
+  }
+
+  .loss-name {
+    font-size: 11px;
+    font-weight: 700;
+    color: #991b1b;
+    margin-bottom: 3px;
+  }
+
+  .loss-desc {
+    font-size: 9px;
+    color: #b91c1c;
+    opacity: 0.8;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  .legend-line {
+    width: 28px;
+    height: 2px;
+    border-radius: 1px;
+  }
+
+  .legend-line.forward {
+    background: var(--accent-blue);
+  }
+
+  .legend-line.backward {
+    background: var(--loss-color);
+    background: repeating-linear-gradient(
+      90deg,
+      var(--loss-color) 0px,
+      var(--loss-color) 4px,
+      transparent 4px,
+      transparent 8px
+    );
+    height: 2px;
+  }
+
+  .legend-line.grad {
+    background: var(--loss-color);
+    background: repeating-linear-gradient(
+      90deg,
+      var(--loss-color) 0px,
+      var(--loss-color) 3px,
+      transparent 3px,
+      transparent 6px
+    );
+    height: 2px;
+  }
+
+  .legend-line.chat {
+    background: var(--accent-orange);
+    background: repeating-linear-gradient(
+      90deg,
+      var(--accent-orange) 0px,
+      var(--accent-orange) 4px,
+      transparent 4px,
+      transparent 8px
+    );
+    height: 2px;
+  }
+
+  /* Shared backbone connector */
+  .shared-backbone-line {
+    position: absolute;
+    left: 195px;
+    top: 0;
+    width: 3px;
+    background: linear-gradient(180deg, var(--contrib2) 0%, var(--accent-blue) 100%);
+    border-radius: 2px;
+    z-index: 5;
+    opacity: 0.25;
+  }
+
+  /* Arrow labels on SVG */
+  .arrow-label {
+    font-size: 9px;
+    font-weight: 600;
+    fill: var(--text-muted);
+    font-family: var(--font-main);
+  }
+
+  .arrow-label-math {
+    font-family: var(--font-math);
+    font-size: 10px;
+    font-style: italic;
+  }
+
+  /* Color key dots */
+  .key-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .dot-c1 { background: var(--contrib1); }
+  .dot-c2 { background: var(--contrib2); }
+  .dot-c3 { background: var(--contrib3); }
+
+  .key-text { font-size: 10px; color: var(--text-muted); }
+
+  /* Zoom panel for GAT detail */
+  .gat-zoom {
+    position: absolute;
+    right: 20px;
+    top: 80px;
+    width: 220px;
+    background: white;
+    border: 1.5px solid var(--contrib1);
+    border-radius: 8px;
+    padding: 10px;
+    box-shadow: var(--shadow-md);
+    z-index: 20;
+  }
+
+  .gat-zoom-title {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--contrib1);
+    margin-bottom: 8px;
+    text-align: center;
+  }
+
+  .gat-mini-graph {
+    background: #eff6ff;
+    border-radius: 4px;
+    padding: 6px;
+    margin-bottom: 6px;
+  }
+
+  .gat-node {
+    fill: white;
+    stroke: var(--contrib1);
+    stroke-width: 1.5;
+  }
+
+  .gat-edge-normal {
+    stroke: #93c5fd;
+    stroke-width: 1.5;
+  }
+
+  .gat-edge-add {
+    stroke: #16a34a;
+    stroke-width: 2;
+    stroke-dasharray: none;
+  }
+
+  .gat-edge-sub {
+    stroke: #dc2626;
+    stroke-width: 2;
+    stroke-dasharray: 4,2;
+  }
+
+  .gat-node-label {
+    font-size: 7px;
+    fill: #1e40af;
+    text-anchor: middle;
+    font-family: var(--font-main);
+  }
+
+  .gat-legend-mini {
+    display: flex;
+    justify-content: space-around;
+    font-size: 8px;
+    color: var(--text-muted);
+  }
+
+  /* Entity encoder mini detail */
+  .entity-zoom {
+    position: absolute;
+    left: 12px;
+    top: 120px;
+    width: 140px;
+    background: white;
+    border: 1.5px solid var(--contrib2);
+    border-radius: 8px;
+    padding: 8px;
+    box-shadow: var(--shadow-md);
+    z-index: 20;
+  }
+
+  .entity-zoom-title {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--contrib2);
+    margin-bottom: 6px;
+    text-align: center;
+  }
+
+  .entity-branch {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 8px;
+    color: var(--text-muted);
+    margin-bottom: 3px;
+  }
+
+  .entity-branch-label {
+    background: #ede9fe;
+    color: #6d28d9;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 7px;
+    font-weight: 700;
+  }
+
+  .entity-concat {
+    text-align: center;
+    font-size: 8px;
+    color: var(--contrib2);
+    font-weight: 700;
+    margin: 4px 0;
+  }
+
+  .entity-out {
+    text-align: center;
+    font-size: 8px;
+    background: #ede9fe;
+    color: #6d28d9;
+    padding: 3px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+<figure>
+<div class="arch-container" id="arch">
+
+  <!-- Shared Backbone visual line -->
+  <div class="shared-backbone-line" style="top:100px; height: 140px;"></div>
+
+  <!-- Zoom panels -->
+  <div class="entity-zoom">
+    <div class="entity-zoom-title">C2 — EntityEncoder</div>
+    <div class="entity-branch">
+      <span class="entity-branch-label">COMPANY</span>
+      <span>→ BGE →</span>
+    </div>
+    <div class="entity-branch">
+      <span class="entity-branch-label">YEAR</span>
+      <span>→ BGE →</span>
+    </div>
+    <div class="entity-branch">
+      <span class="entity-branch-label">SECTOR</span>
+      <span>→ BGE →</span>
+    </div>
+    <div class="entity-concat">⊕ ⊕ → Proj → LN</div>
+    <div class="entity-out">e ∈ ℝ²⁵⁶</div>
+  </div>
+
+  <div class="gat-zoom">
+    <div class="gat-zoom-title">C1 — Entity-Aware GAT</div>
+    <svg class="gat-mini-graph" viewBox="0 0 200 80" xmlns="http://www.w3.org/2000/svg">
+      <!-- Nodes -->
+      <rect class="gat-node" x="15" y="28" width="30" height="24" rx="4"/>
+      <text class="gat-node-label" x="30" y="43">Rev</text>
+
+      <rect class="gat-node" x="85" y="8" width="30" height="24" rx="4"/>
+      <text class="gat-node-label" x="100" y="23">COGS</text>
+
+      <rect class="gat-node" x="85" y="48" width="30" height="24" rx="4"/>
+      <text class="gat-node-label" x="100" y="63">GP</text>
+
+      <rect class="gat-node" x="155" y="28" width="30" height="24" rx="4"/>
+      <text class="gat-node-label" x="170" y="43">e<sub>D</sub></text>
+
+      <!-- Edges -->
+      <line class="gat-edge-sub" x1="45" y1="38" x2="85" y2="18"/>
+      <line class="gat-edge-add" x1="45" y1="42" x2="85" y2="60"/>
+      <line class="gat-edge-add" x1="115" y1="58" x2="155" y2="38"/>
+      <line class="gat-edge-normal" x1="155" y1="48" x2="185" y2="38" stroke-dasharray="2,2" opacity="0.4"/>
+
+      <!-- Omega labels -->
+      <text x="62" y="22" font-size="7" fill="#16a34a" font-weight="bold" font-family="var(--font-math)">ω=−1</text>
+      <text x="62" y="58" font-size="7" fill="#16a34a" font-weight="bold" font-family="var(--font-math)">ω=+1</text>
+      <text x="132" y="55" font-size="7" fill="#16a34a" font-weight="bold" font-family="var(--font-math)">ω=+1</text>
+    </svg>
+    <div class="gat-legend-mini">
+      <span>─ ω=+1 additive</span>
+      <span>┄ ω=−1 subtractive</span>
+    </div>
+  </div>
+
+  <!-- Title -->
+  <div class="arch-title">
+    GSR-CACL: Graph-Structured Retrieval with Constraint-Aware Contrastive Learning
+    <span>Overall architecture — forward dataflow (solid) and training gradients (dashed)</span>
+  </div>
+
+  <!-- SVG Arrows -->
+  <svg class="arrows-svg" id="arrowsSvg" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <!-- Arrowhead markers -->
+      <marker id="arr-blue" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L6,3 z" fill="#3b82f6"/>
+      </marker>
+      <marker id="arr-purple" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L6,3 z" fill="#8b5cf6"/>
+      </marker>
+      <marker id="arr-green" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L6,3 z" fill="#10b981"/>
+      </marker>
+      <marker id="arr-orange" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L6,3 z" fill="#f59e0b"/>
+      </marker>
+      <marker id="arr-red" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L6,3 z" fill="#ef4444"/>
+      </marker>
+      <!-- Dashed patterns for gradients -->
+    </defs>
+  </svg>
+
+  <!-- Main Grid -->
+  <div class="grid" id="mainGrid">
+
+    <!-- Column 1: Inputs -->
+    <div class="col-input">
+
+      <!-- Document -->
+      <div class="box box-doc row-doc" style="margin-bottom:12px;">
+        <div class="box-label">Document</div>
+        <div class="box-val" style="font-size:10px; text-align:left; margin-top:4px;">
+          <strong>Text:</strong> Annual report...<br>
+          <strong>Table:</strong> | Revenue | COGS | GP |<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| 100K | 70K | 30K |<br>
+          <strong>Meta:</strong> Apple · 2023 · Tech
+        </div>
+      </div>
+
+      <!-- Query -->
+      <div class="box box-query" style="margin-bottom:12px;">
+        <div class="box-label">Query Q</div>
+        <div class="box-val">"What is Apple's<br>Gross Profit in 2023?"</div>
+      </div>
+
+      <!-- Metadata -->
+      <div class="box box-meta" style="margin-bottom:12px;">
+        <div class="box-label">Entity Meta</div>
+        <div class="box-val" style="font-size:10px;">
+          Apple · 2023 · Technology
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="box box-table" style="margin-bottom:12px;">
+        <div class="box-label">Table Cells</div>
+        <div class="box-val" style="font-size:10px; font-family:monospace;">
+          [Revenue, 100K, r=0,c=0]<br>
+          [COGS, 70K, r=1,c=0]<br>
+          [GP, 30K, r=2,c=0]
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Spacer -->
+    <div class="spacer-row"></div>
+
+    <!-- Column 2: Encoders -->
+    <div class="col-text" style="display:flex; flex-direction:column; gap:12px;">
+
+      <!-- Text Encoder -->
+      <div class="encoder-box text-encoder">
+        <div class="box-label">C2 — Shared Backbone</div>
+        <div class="encoder-name">Text Encoder</div>
+        <div class="encoder-sub">BGE-Large (335M)</div>
+        <div class="encoder-detail">d<sub>text</sub> = 1024</div>
+      </div>
+
+      <!-- Entity Encoder -->
+      <div class="encoder-box entity-encoder">
+        <div class="box-label">C2 — Shared Backbone</div>
+        <div class="encoder-name">Entity Encoder</div>
+        <div class="encoder-sub">Shared BGE + Projection</div>
+        <div class="encoder-detail">e<sub>Q</sub>, e<sub>D</sub> ∈ ℝ²⁵⁶</div>
+      </div>
+
+      <!-- Template + GAT -->
+      <div class="encoder-box gat-encoder">
+        <div class="box-label">C1 — Novel Contribution</div>
+        <div class="encoder-name">Entity-Aware GAT</div>
+        <div class="encoder-sub">2-layer · 4-head · edge-aware</div>
+        <div class="encoder-detail">d<sub>KG</sub> = 256</div>
+      </div>
+
+    </div>
+
+    <!-- Spacer -->
+    <div class="spacer-row"></div>
+
+    <!-- Column 3: Intermediate values -->
+    <div class="col-center" style="display:flex; flex-direction:column; align-items:center; gap:14px; padding:0 8px;">
+
+      <div style="text-align:center;">
+        <div style="font-size:11px; font-weight:700; color:#1e40af; background:#dbeafe; border-radius:4px; padding:4px 10px; display:inline-block;">
+          d<sub>text</sub> ∈ ℝ¹⁰²⁴
+        </div>
+      </div>
+
+      <div style="text-align:center;">
+        <div style="font-size:11px; font-weight:700; color:#6d28d9; background:#ede9fe; border-radius:4px; padding:4px 10px; display:inline-block;">
+          e<sub>Q</sub>, e<sub>D</sub> ∈ ℝ²⁵⁶
+        </div>
+      </div>
+
+      <div>
+        <div class="template-box" style="margin-bottom:6px;">
+          Template Parsing<br>
+          <span style="font-size:9px; color:#b45309;">15 IFRS/GAAP patterns</span>
+        </div>
+        <div style="font-size:11px; text-align:center; color:#1d4ed8; font-weight:700; background:#dbeafe; border-radius:4px; padding:4px 10px;">
+          Constraint KG<br>
+          <span style="font-size:9px; font-weight:400; color:#3b82f6;">nodes + ω-edges</span>
+        </div>
+      </div>
+
+      <div style="text-align:center;">
+        <div style="font-size:11px; font-weight:700; color:#1e40af; background:#dbeafe; border-radius:4px; padding:4px 10px; display:inline-block;">
+          d<sub>KG</sub> ∈ ℝ²⁵⁶
+        </div>
+      </div>
+
+      <!-- CHAP Sampler -->
+      <div style="text-align:center;">
+        <div style="font-size:11px; font-weight:700; color:#92400e; background:#fef3c7; border:1.5px solid #fde68a; border-radius:6px; padding:6px 10px; margin-bottom:4px;">
+          C3 — CHAP Negative Sampler
+        </div>
+        <div style="font-size:9px; color:#b45309;">A / S / E perturbations</div>
+      </div>
+
+    </div>
+
+    <!-- Spacer -->
+    <div class="spacer-row"></div>
+
+    <!-- Column 4: Joint Scorer -->
+    <div class="col-scorer">
+      <div class="scorer-box" style="margin-top:60px;">
+        <div class="box-label">C1+C2 — Joint Scoring</div>
+        <div class="scorer-name">Joint Scorer</div>
+        <div class="scorer-inputs">
+          <div class="scorer-input-row">
+            <span class="arrow-in">→</span>
+            <span>d<sub>text</sub></span>
+          </div>
+          <div class="scorer-input-row">
+            <span class="arrow-in">→</span>
+            <span>e<sub>D</sub></span>
+          </div>
+          <div class="scorer-input-row">
+            <span class="arrow-in">→</span>
+            <span>d<sub>KG</sub></span>
+          </div>
+        </div>
+        <div style="font-size:10px; color:#6c757d; background:#f0fdf4; border-radius:4px; padding:4px 8px;">
+          + Constraint Score CS(G<sub>D</sub>)
+        </div>
+      </div>
+    </div>
+
+    <!-- Column 5: Output -->
+    <div class="col-output">
+      <div class="output-box" style="margin-top:90px;">
+        <div class="box-label" style="color:#15803d; opacity:0.7;">Ranking Score</div>
+        <div class="output-name">s(Q, C)</div>
+        <div class="output-formula">
+          α·d<sub>text</sub> + β·e<sub>D</sub> + γ·CS
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Training Losses -->
+  <div class="loss-section">
+    <div class="loss-section-title">Training Losses (gradient flow — dashed lines)</div>
+    <div class="loss-grid">
+      <div class="loss-box">
+        <div class="loss-name">L<sub>EntitySupCon</sub></div>
+        <div class="loss-desc">Entity clustering<br>C2 back → Shared BGE</div>
+      </div>
+      <div class="loss-box">
+        <div class="loss-name">L<sub>triplet</sub></div>
+        <div class="loss-desc">Rank positive &gt; negative<br>back → Joint Scorer</div>
+      </div>
+      <div class="loss-box">
+        <div class="loss-name">L<sub>constraint</sub></div>
+        <div class="loss-desc">CHAP validity<br>back → GAT + Scorer</div>
+      </div>
+      <div class="loss-box">
+        <div class="loss-name">L<sub>CACLLoss</sub></div>
+        <div class="loss-desc">Combined: triplet<br>+ λ<sub>c</sub>·constraint</div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item">
+        <div class="legend-line forward"></div>
+        <span>Forward pass (inference)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-line grad"></div>
+        <span>Gradient backpropagation</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-line chat"></div>
+        <span>CHAP negative generation</span>
+      </div>
+      <div class="legend-item" style="margin-left:16px;">
+        <span class="key-dot dot-c1"></span>
+        <span class="key-text">C1: Graph-Structured KG</span>
+      </div>
+      <div class="legend-item">
+        <span class="key-dot dot-c2"></span>
+        <span class="key-text">C2: EntitySupCon Loss</span>
+      </div>
+      <div class="legend-item">
+        <span class="key-dot dot-c3"></span>
+        <span class="key-text">C3: CHAP Hard Negatives</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<figcaption>
+  Fig. 1: GSR-CACL overall architecture. Solid arrows denote forward dataflow; dashed arrows denote training gradient backpropagation.
+  Components shaded in <span style="color:var(--contrib1);">blue</span> (C1), <span style="color:var(--contrib2);">purple</span> (C2), and <span style="color:var(--contrib3);">green</span> (C3) are novel contributions.
+  BGE-Large is used as a shared backbone for both Text and Entity encoders (C2), enabling gradient flow from entity loss to text representations.
+</figcaption>
+</figure>
+
+<script>
+// Draw SVG arrows after layout is computed
+function drawArrows() {
+  const svg = document.getElementById('arrowsSvg');
+  const container = document.getElementById('arch');
+  const grid = document.getElementById('mainGrid');
+
+  if (!svg || !grid) return;
+
+  // Get positions of key elements relative to the container
+  const rect = container.getBoundingClientRect();
+  const gridRect = grid.getBoundingClientRect();
+
+  // Helper to get element center relative to SVG
+  function getCenter(el) {
+    const r = el.getBoundingClientRect();
+    return {
+      x: r.left + r.width / 2 - rect.left,
+      y: r.top + r.height / 2 - rect.top
+    };
+  }
+
+  // We'll add arrows manually using known positions based on CSS grid
+  // This is a simplified approach: use percentage-based positioning
+
+  const W = container.offsetWidth;
+  const H = container.offsetHeight;
+
+  const svgNS = "http://www.w3.org/2000/svg";
+
+  // Clear existing
+  svg.innerHTML = document.getElementById('arrowsSvg').innerHTML;
+
+  function addArrow(x1, y1, x2, y2, color, dashed, label, markerEnd) {
+    const line = document.createElementNS(svgNS, "line");
+    line.setAttribute("x1", x1);
+    line.setAttribute("y1", y1);
+    line.setAttribute("x2", x2);
+    line.setAttribute("y2", y2);
+    line.setAttribute("stroke", color);
+    line.setAttribute("stroke-width", "1.5");
+    if (dashed) {
+      line.setAttribute("stroke-dasharray", "4,3");
+      line.setAttribute("opacity", "0.7");
+    }
+    if (markerEnd) line.setAttribute("marker-end", `url(#arr-${markerEnd})`);
+    svg.appendChild(line);
+
+    if (label) {
+      const txt = document.createElementNS(svgNS, "text");
+      txt.setAttribute("x", (x1 + x2) / 2);
+      txt.setAttribute("y", (y1 + y2) / 2 - 4);
+      txt.setAttribute("class", "arrow-label arrow-label-math");
+      txt.setAttribute("fill", color);
+      txt.setAttribute("opacity", "0.8");
+      txt.textContent = label;
+      svg.appendChild(txt);
+    }
+  }
+
+  // Grid layout approximate positions (based on CSS grid with 5 cols)
+  const col1 = W * 0.085;  // inputs
+  const col2 = W * 0.245;  // encoders
+  const col3 = W * 0.49;   // center
+  const col4 = W * 0.745;  // scorer
+  const col5 = W * 0.915;  // output
+
+  // Row positions (approximate)
+  // Doc row ~0.16 of H, Query ~0.28, Meta ~0.40, Table ~0.52, KG ~0.64, CHAP ~0.76
+  const rowDoc   = H * 0.15;
+  const rowQuery = H * 0.27;
+  const rowMeta  = H * 0.39;
+  const rowTable = H * 0.50;
+  const rowKG    = H * 0.60;
+  const rowCHAP  = H * 0.72;
+  const rowEncT  = H * 0.17;  // text encoder
+  const rowEncE  = H * 0.40;  // entity encoder
+  const rowEncG  = H * 0.57;  // GAT
+  const rowScorer = H * 0.48;
+  const rowOutput = H * 0.48;
+
+  // ── Forward arrows ──────────────────────────────────────────
+
+  // Doc text → Text Encoder
+  addArrow(col1 + 75, rowDoc, col2 - 5, rowEncT, "#3b82f6", false, "d_text");
+
+  // Query → Text Encoder (same encoder)
+  addArrow(col1 + 75, rowQuery, col2 - 5, rowEncT + 20, "#3b82f6", false, "Q");
+
+  // Text Encoder → center value
+  addArrow(col2 + 95, rowEncT + 15, col3 - 5, rowDoc + 10, "#3b82f6", false, "d_text");
+
+  // Metadata → Entity Encoder
+  addArrow(col1 + 75, rowMeta, col2 - 5, rowEncE + 10, "#8b5cf6", false, "meta");
+
+  // Entity Encoder → center
+  addArrow(col2 + 95, rowEncE + 15, col3 - 5, rowMeta + 10, "#8b5cf6", false, "e_D");
+
+  // Table cells → Template Parsing (center)
+  addArrow(col1 + 75, rowTable, col3 - 5, rowTable - 5, "#f59e0b", false, null);
+
+  // Template Parsing → GAT Encoder
+  addArrow(col3 + 5, rowKG - 5, col2 + 95, rowEncG + 15, "#f59e0b", false, "KG");
+
+  // GAT Encoder → d_KG (center)
+  addArrow(col2 + 95, rowEncG + 15, col3 - 5, rowKG + 10, "#3b82f6", false, "d_KG");
+
+  // d_KG → Joint Scorer
+  addArrow(col3 + 5, rowKG + 10, col4 - 5, rowScorer + 30, "#3b82f6", false, null);
+
+  // e_D → Joint Scorer
+  addArrow(col3 + 5, rowMeta + 10, col4 - 5, rowScorer + 10, "#8b5cf6", false, null);
+
+  // d_text → Joint Scorer
+  addArrow(col3 + 5, rowDoc + 10, col4 - 5, rowScorer - 10, "#3b82f6", false, null);
+
+  // Joint Scorer → Output
+  addArrow(col4 + 95, rowScorer + 15, col5 - 5, rowOutput, "#10b981", false, "s");
+
+  // Constraint KG → CHAP
+  addArrow(col3, rowKG + 10, col3, rowCHAP, "#f59e0b", false, null);
+
+  // CHAP → Joint Scorer
+  addArrow(col3 + 5, rowCHAP, col4 - 5, rowScorer + 50, "#f59e0b", false, "C-");
+
+  // ── Gradient arrows (dashed) ───────────────────────────────
+
+  // L_EntitySupCon → Entity Encoder (upward dashed)
+  addArrow(col2 + 60, rowEncE + 25, col2 + 60, rowEncE - 5, "#ef4444", true, "∂L_c2");
+
+  // Shared backbone gradient line (vertical purple-blue)
+  const gradientLine = document.createElementNS(svgNS, "line");
+  gradientLine.setAttribute("x1", col2 - 15);
+  gradientLine.setAttribute("y1", rowEncE + 10);
+  gradientLine.setAttribute("x2", col2 - 15);
+  gradientLine.setAttribute("y2", rowEncT + 40);
+  gradientLine.setAttribute("stroke", "#ef4444");
+  gradientLine.setAttribute("stroke-width", "1.5");
+  gradientLine.setAttribute("stroke-dasharray", "4,3");
+  gradientLine.setAttribute("opacity", "0.5");
+  svg.appendChild(gradientLine);
+
+  // L_triplet → Joint Scorer
+  addArrow(col4 + 40, rowScorer + 65, col4 + 40, rowScorer + 30, "#ef4444", true, "∂L_triplet");
+
+  // L_constraint → CHAP → Joint Scorer
+  addArrow(col4 + 40, rowScorer + 65, col3 + 20, rowCHAP, "#ef4444", true, "∂L_constraint");
+
+  // L_constraint → GAT
+  addArrow(col2 + 80, rowEncG + 35, col2 + 80, rowEncG + 15, "#ef4444", true, "∂L_cs");
+
+}
+
+window.addEventListener("load", drawArrows);
+window.addEventListener("resize", drawArrows);
+</script>
+
+</body>
+</html>

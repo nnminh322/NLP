@@ -1,26 +1,23 @@
 #!/usr/bin/env python3
 """
-GSR + CACL Training Script.
+GSR + CACL Training Script (END-TO-END WITH ENTITY SUPERVISED CONTRASTIVE LEARNING).
 
-Three-stage training (overall_idea.md §4.7, architecture.md §5):
-  Stage 1 — Identity Pretraining:   learn (Company, Year) discrimination via entity scoring
-  Stage 2 — Structural Pretraining: KG encoding + constraint scoring calibration
-  Stage 3 — Joint Finetuning:       full CACL objective with CHAP negatives
+Three-stage curriculum training (§4.7 of proposal):
+    Stage 1 — Identity:     learn entity discrimination via SupCon + TripletLoss
+    Stage 2 — Structural:   learn KG encoding + constraint score calibration
+    Stage 3 — Joint CACL:  full CACL objective with CHAP hard negatives
 
-All stages support end-to-end training with gradient flow through the text encoder.
-Fine-tuning strategy is configurable: "full", "lora", or "frozen".
+Key improvements over legacy train.py:
+    - Uses SharedEncoder (shared BGE backbone) for both text AND entity encoding
+    - EntitySupConLoss from §4.4 of proposal
+    - EntityEncoder produces learned s_entity = cos(e_Q, e_D)
+    - JointScorer updated with entity_embed_dim
+    - GAT encoder receives entity embeddings for EntitySim term
 
 Usage:
-    # Full fine-tuning on Kaggle/Colab T4 GPU (recommended)
-    python -m gsr_cacl.train --dataset finqa --stage all --epochs 5 --batch-size 8 \
-        --encoder BAAI/bge-large-en-v1.5 --finetune lora
-
-    # Full fine-tuning on A100 (no resource limit)
-    python -m gsr_cacl.train --dataset finqa --stage all --epochs 5 --batch-size 16 \
-        --encoder BAAI/bge-large-en-v1.5 --finetune full
-
-    # Legacy frozen mode (not recommended for benchmark)
-    python -m gsr_cacl.train --dataset finqa --stage all --finetune frozen
+    python -m gsr_cacl.train --dataset finqa --stage all --preset t4 --gradient-checkpointing
+    python -m gsr_cacl.train --dataset finqa --stage identity --epochs 3
+    python -m gsr_cacl.train --dataset finqa --stage all --add-entity-sim
 """
 
 from __future__ import annotations
@@ -28,10 +25,10 @@ from __future__ import annotations
 import argparse
 import logging
 from pathlib import Path
+from typing import Literal
 
 import torch
 import torch.nn.functional as F
-from datasets import load_dataset
 from tqdm import tqdm
 
 from gsr_cacl.training import (
@@ -39,17 +36,18 @@ from gsr_cacl.training import (
     RetrievalSample,
     CACLLoss,
     TripletLoss,
+    EntitySupConLoss,
+    EntityRegistry,
 )
 from gsr_cacl.negative_sampler import CHAPNegativeSampler
 from gsr_cacl.kg import build_constraint_kg
 from gsr_cacl.scoring import JointScorer, compute_constraint_score
 from gsr_cacl.scoring.constraint_score import ConstraintScoringVersion
-from gsr_cacl.encoders import GATEncoder, TextEncoder, build_numeric_encoder
+from gsr_cacl.encoders import GATEncoder, build_numeric_encoder
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-# Dataset configs (mirrors benchmark_gsr.py)
 DATASET_CONFIGS = {
     "finqa": {"config_name": "FinQA", "train_split": "train", "eval_split": "test"},
     "convfinqa": {"config_name": "ConvFinQA", "train_split": "turn_0", "eval_split": "turn_0"},
@@ -57,12 +55,7 @@ DATASET_CONFIGS = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _collect_trainable_params(*modules: torch.nn.Module) -> list[torch.nn.Parameter]:
-    """Collect all parameters requiring gradients from multiple modules."""
+def _collect_trainable_params(*modules):
     params = []
     seen = set()
     for m in modules:
@@ -73,199 +66,165 @@ def _collect_trainable_params(*modules: torch.nn.Module) -> list[torch.nn.Parame
     return params
 
 
-# ---------------------------------------------------------------------------
-# Data loading (no g4k — load from HuggingFace directly)
-# ---------------------------------------------------------------------------
+def _batch_meta_to_tensors(samples, device):
+    companies = [s.company_name for s in samples]
+    years = [s.report_year for s in samples]
+    sectors = [s.company_sector for s in samples]
+    return companies, years, sectors
 
-def load_training_data(dataset: str, split: str = "train") -> list[RetrievalSample]:
-    """Load training samples from T²-RAGBench via HuggingFace datasets."""
-    ds_cfg = DATASET_CONFIGS.get(dataset)
-    if ds_cfg is None:
-        raise ValueError(f"Unknown dataset: {dataset}")
 
+def build_encoder(
+    model_name, finetune, lora_r=16, lora_alpha=32, lora_dropout=0.05,
+    entity_dim=256, max_length=512,
+):
+    from gsr_cacl.encoders.entity_encoder import SharedEncoder
+    return SharedEncoder(
+        model_name=model_name, finetune=finetune,
+        lora_r=lora_r, lora_alpha=lora_alpha, lora_dropout=lora_dropout,
+        entity_dim=entity_dim, max_length=max_length,
+    )
+
+
+def load_training_data(dataset, split="train"):
+    from datasets import load_dataset
+    ds_cfg = DATASET_CONFIGS[dataset]
     hf_split = ds_cfg["train_split"] if split == "train" else ds_cfg["eval_split"]
     logger.info(f"Loading {hf_split} split for {dataset}...")
-    df = load_dataset(
-        "G4KMU/t2-ragbench",
-        ds_cfg["config_name"],
-        split=hf_split,
-    ).to_pandas()
-
+    df = load_dataset("G4KMU/t2-ragbench", ds_cfg["config_name"], split=hf_split).to_pandas()
     samples = []
-    for _, row in tqdm(df.iterrows(), total=len(df), desc="Preparing training samples"):
-        query = f"{row.get('company_name', '')}: {row.get('question', '')}"
-        context = str(row.get("context", ""))
+    for _, row in tqdm(df.iterrows(), total=len(df), desc="Preparing samples"):
         sample = RetrievalSample(
-            query=query,
-            positive_context=context,
+            query=f"{row.get('company_name', '')}: {row.get('question', '')}",
+            positive_context=str(row.get("context", "")),
             negative_contexts=[],
             company_name=str(row.get("company_name", "")),
             report_year=str(row.get("report_year", "")),
             company_sector=str(row.get("company_sector", "")),
         )
         samples.append(sample)
-
     logger.info(f"Loaded {len(samples)} training samples")
     return samples
 
 
-def _meta_to_tensor(sample: RetrievalSample, device: torch.device) -> torch.Tensor:
-    """Convert sample metadata to float tensor [3] for entity matching.
+# ─── Stage 1 ───────────────────────────────────────────────────────────────────
 
-    Encodes company_name, report_year, company_sector as hashed floats for comparison.
-    """
-    def _hash_str(s: str) -> float:
-        h = 0
-        for c in s.lower().strip():
-            h = (h * 31 + ord(c)) % 10000
-        return h / 10000.0
-
-    return torch.tensor(
-        [_hash_str(sample.company_name), _hash_str(sample.report_year), _hash_str(sample.company_sector)],
-        dtype=torch.float32, device=device,
-    )
-
-
-# ---------------------------------------------------------------------------
-# Stage 1 — Identity Pretraining (§4.7 / architecture.md §5.1)
-# ---------------------------------------------------------------------------
-
-def stage_identity(
-    text_encoder: TextEncoder,
-    scorer: JointScorer,
-    gat_encoder: GATEncoder,
-    dataset: list[RetrievalSample],
-    device: torch.device,
-    epochs: int = 3,
-    lr: float = 1e-4,
-    batch_size: int = 16,
-) -> None:
-    """Train entity matching: learn to distinguish (Company, Year) pairs.
-
-    End-to-end: texts → TextEncoder → JointScorer → TripletLoss → backprop
-    through both scorer AND text encoder.
-    """
+def stage_identity(encoder, scorer, gat_encoder, dataset, device, entity_registry,
+                   epochs=3, lr=1e-4, batch_size=16, entity_dim=256):
     logger.info("=== Stage 1: Identity Pretraining ===")
-    params = _collect_trainable_params(text_encoder, scorer)
-    optimizer = torch.optim.Adam(params, lr=lr)
-    triplet = TripletLoss(margin=0.2)
+    params = _collect_trainable_params(encoder, scorer)
+    optimizer = torch.optim.AdamW(params, lr=lr, weight_decay=0.01)
+    triplet_loss = TripletLoss(margin=0.2)
+    supcon_loss = EntitySupConLoss(temperature=0.07)
 
     dataset_obj = RetrievalDataset(dataset)
     dataloader = torch.utils.data.DataLoader(
         dataset_obj, batch_size=batch_size, shuffle=True, collate_fn=lambda b: b,
     )
-
-    text_encoder.train()
+    encoder.train()
     scorer.train()
+
     for epoch in range(epochs):
-        total_loss = 0.0
+        total_loss = trip_loss = supcon_loss_total = 0.0
         n_batches = 0
+
         for batch in tqdm(dataloader, desc=f"Identity Epoch {epoch+1}"):
             B = len(batch)
-
-            # Batch encode queries and documents through differentiable encoder
             queries = [s.query for s in batch]
             docs = [s.positive_context[:512] for s in batch]
 
-            q_t = text_encoder(queries)      # [B, embed_dim] with grad
-            d_t = text_encoder(docs)          # [B, embed_dim] with grad
+            # Text encoding
+            q_text_emb = encoder.text_encode(queries)
+            d_text_emb = encoder.text_encode(docs)
 
-            q_metas = []
-            d_metas_pos = []
-            d_metas_neg = []
-            for sample in batch:
-                q_metas.append(_meta_to_tensor(sample, device))
-                d_metas_pos.append(_meta_to_tensor(sample, device))
+            # FIX ISSUE 5: Different entity representations for Q vs D
+            # Query → original name, Doc → canonical name from registry
+            q_companies = [s.company_name for s in batch]
+            q_years = [s.report_year for s in batch]
+            q_sectors = [s.company_sector for s in batch]
+            d_companies = [
+                entity_registry.get_canonical_name(s.company_name) or s.company_name
+                for s in batch
+            ]
+            d_years = [s.report_year for s in batch]
+            d_sectors = [s.company_sector for s in batch]
 
-            # Create negative: swap entity metadata within batch (circular shift)
-            for i in range(B):
-                neg_idx = (i + 1) % B
-                d_metas_neg.append(_meta_to_tensor(batch[neg_idx], device))
+            q_entity_emb = encoder.entity_encode(q_companies, q_years, q_sectors)
+            d_entity_emb = encoder.entity_encode(d_companies, d_years, d_sectors)
+
+            # SupCon loss: learn that "Apple" and "Apple Inc." are the same entity
+            entity_labels = entity_registry.build_entity_labels(q_companies)
+            loss_supcon = supcon_loss(q_entity_emb, entity_labels)
+
+            # Triplet loss: negatives swap entity within batch
+            neg_companies = [batch[(i + 1) % B].company_name for i in range(B)]
+            neg_years = [batch[(i + 1) % B].report_year for i in range(B)]
+            neg_sectors = [batch[(i + 1) % B].company_sector for i in range(B)]
+            neg_entity_emb = encoder.entity_encode(neg_companies, neg_years, neg_sectors)
 
             kg_dummy = torch.zeros(B, gat_encoder.hidden_dim, device=device)
-            q_meta_t = torch.stack(q_metas)
-            d_meta_pos_t = torch.stack(d_metas_pos)
-            d_meta_neg_t = torch.stack(d_metas_neg)
-
-            # Constraint features: neutral (all 1.0, 0.0, 0.0) — not trained in Stage 1
             cs_feats = torch.tensor([[1.0, 0.0, 0.0]] * B, device=device)
 
-            pos_scores = scorer(q_t, d_t, kg_dummy, q_meta_t, d_meta_pos_t, cs_feats)
-            neg_scores = scorer(q_t, d_t, kg_dummy, q_meta_t, d_meta_neg_t, cs_feats)
-
-            loss = triplet(pos_scores, neg_scores)
+            pos_scores = scorer(q_text_emb, d_text_emb, kg_dummy, q_entity_emb, d_entity_emb, cs_feats)
+            neg_scores = scorer(q_text_emb, d_text_emb, kg_dummy, q_entity_emb, neg_entity_emb, cs_feats)
+            loss_triplet = triplet_loss(pos_scores, neg_scores)
+            loss_total = loss_triplet + loss_supcon
 
             optimizer.zero_grad()
-            loss.backward()
+            loss_total.backward()
             torch.nn.utils.clip_grad_norm_(params, 1.0)
             optimizer.step()
-            total_loss += loss.item()
+
+            total_loss += loss_total.item()
+            trip_loss += loss_triplet.item()
+            supcon_loss_total += loss_supcon.item()
             n_batches += 1
 
-        logger.info(f"Epoch {epoch+1} — Loss: {total_loss/max(n_batches,1):.4f}")
+        logger.info(
+            f"Epoch {epoch+1} — Loss: {total_loss/max(n_batches,1):.4f} "
+            f"(triplet={trip_loss/max(n_batches,1):.4f}, supcon={supcon_loss_total/max(n_batches,1):.4f})"
+        )
 
 
-# ---------------------------------------------------------------------------
-# Stage 2 — Structural Pretraining (§4.7 / architecture.md §5.1)
-# ---------------------------------------------------------------------------
+# ─── Stage 2 ───────────────────────────────────────────────────────────────────
 
-def stage_structural(
-    text_encoder: TextEncoder,
-    scorer: JointScorer,
-    gat_encoder: GATEncoder,
-    dataset: list[RetrievalSample],
-    device: torch.device,
-    epochs: int = 3,
-    lr: float = 1e-4,
-    batch_size: int = 8,
-    contr_version: ConstraintScoringVersion = "v1",
-) -> None:
-    """Train KG encoding + constraint scoring calibration.
-
-    Objective: MSE(CS(G_D), 1.0) — push well-formed KGs to score ≈ 1.
-    End-to-end: TextEncoder + GATEncoder + JointScorer all receive gradients.
-    """
+def stage_structural(encoder, scorer, gat_encoder, dataset, device,
+                    epochs=3, lr=1e-4, batch_size=8,
+                    contr_version="v1", entity_dim=256):
     logger.info("=== Stage 2: Structural Pretraining ===")
-    params = _collect_trainable_params(text_encoder, scorer, gat_encoder)
-    optimizer = torch.optim.Adam(params, lr=lr)
+    params = _collect_trainable_params(encoder, scorer, gat_encoder)
+    optimizer = torch.optim.AdamW(params, lr=lr, weight_decay=0.01)
 
     dataset_obj = RetrievalDataset(dataset)
     dataloader = torch.utils.data.DataLoader(
         dataset_obj, batch_size=batch_size, shuffle=True, collate_fn=lambda b: b,
     )
-
-    text_encoder.train()
+    encoder.train()
     scorer.train()
     gat_encoder.train()
+
     for epoch in range(epochs):
         total_loss = 0.0
         n_batches = 0
+
         for batch in tqdm(dataloader, desc=f"Structural Epoch {epoch+1}"):
             B = len(batch)
+            companies, years, sectors = _batch_meta_to_tensors(batch, device)
 
-            # Build KGs and encode them (gradient flows through GATEncoder)
             kg_embeds = []
             cs_results = []
             for sample in batch:
                 kg = build_constraint_kg(sample.positive_context)
-                kg_embed = gat_encoder.encode_graph(kg)
+                kg_embed = gat_encoder.encode_graph(kg, entity_embeddings=None)
                 kg_embeds.append(kg_embed)
                 cs_results.append(compute_constraint_score(kg, version=contr_version))
 
-            kg_embed_t = torch.stack(kg_embeds)  # [B, hidden_dim]
-
-            # Constraint features through scorer
+            kg_embed_t = torch.stack(kg_embeds)
             cs_feats = scorer.build_constraint_features(cs_results, device)
-            predicted_cs = scorer.forward_constraint(cs_feats)  # [B]
-            target_cs = torch.ones(B, device=device)  # well-formed KGs → score 1.0
+            predicted_cs = scorer.forward_constraint(cs_feats)
+            target_cs = torch.ones(B, device=device)
 
-            # MSE loss: push constraint refinement towards 1.0
-            loss_cs = F.mse_loss(predicted_cs, target_cs)
-
-            # Regularization: encourage KG embeddings to be non-degenerate
-            loss_reg = -torch.clamp(kg_embed_t.var(dim=0).mean(), max=1.0) * 0.1
-
-            loss = loss_cs + loss_reg
+            loss = F.mse_loss(predicted_cs, target_cs)
+            loss += -torch.clamp(kg_embed_t.var(dim=0).mean(), max=1.0) * 0.1
 
             optimizer.zero_grad()
             loss.backward()
@@ -277,289 +236,246 @@ def stage_structural(
         logger.info(f"Epoch {epoch+1} — Loss: {total_loss/max(n_batches,1):.4f}")
 
 
-# ---------------------------------------------------------------------------
-# Stage 3 — Joint Finetuning with CACL (§4.6 + §4.7 / architecture.md §5)
-# ---------------------------------------------------------------------------
+# ─── Stage 3 ───────────────────────────────────────────────────────────────────
 
-def stage_joint(
-    text_encoder: TextEncoder,
-    scorer: JointScorer,
-    gat_encoder: GATEncoder,
-    dataset: list[RetrievalSample],
-    device: torch.device,
-    epochs: int = 5,
-    batch_size: int = 16,
-    lr: float = 5e-5,
-    margin: float = 0.2,
-    lambda_constraint: float = 0.5,
-    save_path: Path | None = None,
-    contr_version: ConstraintScoringVersion = "v1",
-) -> None:
-    """Full CACL objective with CHAP negatives — end-to-end.
-
-    For each (Q, C+, C-_CHAP):
-        q = TextEncoder(Q)                    ← gradient flows
-        d+ = TextEncoder(C+)                  ← gradient flows
-        d- = TextEncoder(C-_CHAP)             ← gradient flows
-        kg+ = GATEncoder(build_kg(C+))        ← gradient flows
-        kg- = GATEncoder(build_kg(C-))        ← gradient flows
-        s+ = JointScorer(q, d+, kg+, ...)     ← gradient flows
-        s- = JointScorer(q, d-, kg-, ...)     ← gradient flows
-        loss = CACL(s+, s-, violates)
-        loss.backward()                       ← updates TextEncoder + GATEncoder + JointScorer
-    """
+def stage_joint(encoder, scorer, gat_encoder, dataset, device, entity_registry,
+               epochs=5, batch_size=16, lr=5e-5, margin=0.2,
+               lambda_constraint=0.5, lambda_entity=0.5, save_path=None,
+               contr_version="v1", entity_dim=256, add_entity_sim=False):
     logger.info("=== Stage 3: Joint Finetuning (CACL) ===")
-
-    params = _collect_trainable_params(text_encoder, scorer, gat_encoder)
+    params = _collect_trainable_params(encoder, scorer, gat_encoder)
     optimizer = torch.optim.AdamW(params, lr=lr, weight_decay=0.01)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
-    criterion = CACLLoss(margin=margin, lambda_constraint=lambda_constraint)
-    sampler = CHAPNegativeSampler(chap_a_prob=0.5, chap_s_prob=0.3, chap_e_prob=0.2)
+
+    triplet_loss = TripletLoss(margin=margin)
+    supcon_loss = EntitySupConLoss(temperature=0.07)
+    caclloss = CACLLoss(margin=margin, lambda_constraint=lambda_constraint)
+    chap_sampler = CHAPNegativeSampler(chap_a_prob=0.5, chap_s_prob=0.3, chap_e_prob=0.2)
 
     dataset_obj = RetrievalDataset(dataset)
     dataloader = torch.utils.data.DataLoader(
         dataset_obj, batch_size=batch_size, shuffle=True, collate_fn=lambda b: b,
     )
-
-    text_encoder.train()
+    encoder.train()
     scorer.train()
     gat_encoder.train()
+
     for epoch in range(epochs):
-        total = trip_loss_total = const_loss_total = 0.0
+        total = trip_total = const_total = supcon_total = 0.0
         n_batches = 0
 
         for batch in tqdm(dataloader, desc=f"Joint Epoch {epoch+1}/{epochs}"):
             B = len(batch)
+            companies, years, sectors = _batch_meta_to_tensors(batch, device)
+
+            # FIX ISSUE 5: Q uses original names, D uses canonical names
+            d_companies = [
+                entity_registry.get_canonical_name(c) or c for c in companies
+            ]
+            q_entity_emb = encoder.entity_encode(companies, years, sectors)
+            d_entity_emb = encoder.entity_encode(d_companies, years, sectors)
 
             pos_scores_list = []
             neg_scores_list = []
             violates_list = []
 
-            for sample in batch:
-                # Query embedding — differentiable
-                q_emb = text_encoder.encode_single(sample.query).unsqueeze(0)  # [1, d]
+            for idx, sample in enumerate(batch):
+                q_text_emb = encoder.text_encode([sample.query])
+                d_text_emb = encoder.text_encode([sample.positive_context[:512]])
 
-                # Positive: KG + text embedding — differentiable
+                # FIX ISSUE 6: Index into correct entity embeddings for this sample
+                q_e = q_entity_emb[idx:idx+1]   # [1, entity_dim]
+                d_e = d_entity_emb[idx:idx+1]   # [1, entity_dim]
+
+                # KG + constraint for positive
                 pos_kg = build_constraint_kg(sample.positive_context)
-                pos_kg_embed = gat_encoder.encode_graph(pos_kg).unsqueeze(0)  # [1, h]
-                pos_d_emb = text_encoder.encode_single(
-                    sample.positive_context[:512]
-                ).unsqueeze(0)  # [1, d]
+                # FIX ISSUE 9: Pass entity embeddings to GAT if EntitySim is enabled
+                if add_entity_sim and gat_encoder.add_entity_sim:
+                    ent_emb_for_kg = q_e.squeeze(0)      # [entity_dim]
+                    pos_kg_emb = gat_encoder.encode_graph(
+                        pos_kg, entity_embeddings=ent_emb_for_kg.unsqueeze(0)
+                    ).unsqueeze(0)
+                else:
+                    pos_kg_emb = gat_encoder.encode_graph(pos_kg, entity_embeddings=None).unsqueeze(0)
 
-                q_meta = _meta_to_tensor(sample, device).unsqueeze(0)
-                d_meta = _meta_to_tensor(sample, device).unsqueeze(0)
                 pos_cs = compute_constraint_score(pos_kg, version=contr_version)
                 pos_cs_feats = scorer.build_constraint_features([pos_cs], device)
-
-                pos_score = scorer(q_emb, pos_d_emb, pos_kg_embed, q_meta, d_meta, pos_cs_feats)
+                pos_score = scorer(q_text_emb, d_text_emb, pos_kg_emb, q_e, d_e, pos_cs_feats)
                 pos_scores_list.append(pos_score.squeeze(0))
 
-                # Negatives: CHAP perturbation
-                negs = sampler.sample(pos_kg, n_negatives=1)
+                # CHAP negatives
+                negs = chap_sampler.sample(pos_kg, n_negatives=1)
                 if not negs:
-                    from gsr_cacl.negative_sampler import apply_chap_e
+                    from gsr_cacl.negative_sampler.chap import apply_chap_e
                     negs = [apply_chap_e(pos_kg)]
 
                 for neg in negs:
                     neg_kg = build_constraint_kg(neg.table_md)
-                    neg_kg_embed = gat_encoder.encode_graph(neg_kg).unsqueeze(0)
-                    neg_d_emb = text_encoder.encode_single(
-                        neg.table_md[:512]
-                    ).unsqueeze(0)
+                    if add_entity_sim and gat_encoder.add_entity_sim:
+                        neg_kg_emb = gat_encoder.encode_graph(
+                            neg_kg, entity_embeddings=ent_emb_for_kg.unsqueeze(0)
+                        ).unsqueeze(0)
+                    else:
+                        neg_kg_emb = gat_encoder.encode_graph(neg_kg, entity_embeddings=None).unsqueeze(0)
 
+                    neg_text_emb = encoder.text_encode([neg.table_md[:512]])
                     neg_cs = compute_constraint_score(neg_kg, version=contr_version)
                     neg_cs_feats = scorer.build_constraint_features([neg_cs], device)
-
-                    neg_score = scorer(q_emb, neg_d_emb, neg_kg_embed, q_meta, d_meta, neg_cs_feats)
+                    neg_score = scorer(q_text_emb, neg_text_emb, neg_kg_emb, q_e, d_e, neg_cs_feats)
                     neg_scores_list.append(neg_score.squeeze(0))
                     violates_list.append(1.0 if neg.is_violated else 0.0)
 
+            # Stack scores
             pos_scores_t = torch.stack(pos_scores_list)
             neg_scores_t = torch.stack(neg_scores_list)
             violates_t = torch.tensor(violates_list, dtype=torch.float32, device=device)
 
-            # Align dimensions for triplet loss
+            # Align dimensions (ensure at least B negatives)
             neg_for_triplet = neg_scores_t[:B] if len(neg_scores_t) >= B else neg_scores_t
             if len(neg_for_triplet) < B:
                 pad = torch.zeros(B - len(neg_for_triplet), device=device)
                 neg_for_triplet = torch.cat([neg_for_triplet, pad])
 
-            losses = criterion(pos_scores_t, neg_for_triplet, violates_t)
+            # CACL loss: triplet + constraint violation
+            losses = caclloss(pos_scores_t, neg_for_triplet, violates_t)
+
+            # EntitySupConLoss: entity clustering
+            entity_labels = entity_registry.build_entity_labels(companies)
+            loss_supcon = supcon_loss(q_entity_emb, entity_labels)
+
+            loss_total = losses["total"] + lambda_entity * loss_supcon
 
             optimizer.zero_grad()
-            losses["total"].backward()
+            loss_total.backward()
             torch.nn.utils.clip_grad_norm_(params, 1.0)
             optimizer.step()
 
             total += losses["total"].item()
-            trip_loss_total += losses["triplet"].item()
-            const_loss_total += losses["constraint"].item()
+            trip_total += losses["triplet"].item()
+            const_total += losses["constraint"].item()
+            supcon_total += loss_supcon.item()
             n_batches += 1
 
         scheduler.step()
         logger.info(
-            f"Epoch {epoch+1} — "
-            f"Loss: {total/max(n_batches,1):.4f} "
-            f"(triplet={trip_loss_total/max(n_batches,1):.4f}, "
-            f"constraint={const_loss_total/max(n_batches,1):.4f})"
+            f"Epoch {epoch+1} — Loss: {total/max(n_batches,1):.4f} "
+            f"(triplet={trip_total/max(n_batches,1):.4f}, "
+            f"constraint={const_total/max(n_batches,1):.4f}, "
+            f"supcon={supcon_total/max(n_batches,1):.4f})"
         )
 
-        # Checkpoint
         if save_path:
             save_path.mkdir(parents=True, exist_ok=True)
             ckpt = save_path / f"ckpt_epoch_{epoch+1}.pt"
             torch.save({
-                "epoch": epoch + 1,
-                "text_encoder_state": text_encoder.state_dict(),
-                "scorer_state": scorer.state_dict(),
-                "gat_encoder_state": gat_encoder.state_dict(),
-                "optimizer_state": optimizer.state_dict(),
-                "scheduler_state": scheduler.state_dict(),
+                "epoch": epoch + 1, "encoder_state": encoder.state_dict(),
+                "scorer_state": scorer.state_dict(), "gat_encoder_state": gat_encoder.state_dict(),
+                "optimizer_state": optimizer.state_dict(), "scheduler_state": scheduler.state_dict(),
                 "loss": total / max(n_batches, 1),
             }, ckpt)
             logger.info(f"Checkpoint saved: {ckpt}")
 
 
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
+# ─── CLI ───────────────────────────────────────────────────────────────────────
 
-# Recommended encoder presets for different hardware
 ENCODER_PRESETS = {
     "t4":   {"encoder": "BAAI/bge-large-en-v1.5",  "finetune": "lora",   "batch_size": 8},
     "a100": {"encoder": "BAAI/bge-large-en-v1.5",  "finetune": "full",   "batch_size": 16},
-    "v100": {"encoder": "BAAI/bge-base-en-v1.5",   "finetune": "full",   "batch_size": 16},
-    "cpu":  {"encoder": "BAAI/bge-base-en-v1.5",   "finetune": "frozen", "batch_size": 4},
+    "v100": {"encoder": "BAAI/bge-base-en-v1.5",    "finetune": "full",   "batch_size": 16},
+    "cpu":  {"encoder": "BAAI/bge-base-en-v1.5",    "finetune": "frozen", "batch_size": 4},
 }
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="GSR + CACL Training (end-to-end)")
-    parser.add_argument("--dataset", type=str, default="finqa",
-                        choices=["finqa", "convfinqa", "tatqa"])
-    parser.add_argument("--stage", type=str, default="joint",
-                        choices=["identity", "structural", "joint", "all"])
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dataset", default="finqa", choices=["finqa", "convfinqa", "tatqa"])
+    parser.add_argument("--stage", default="joint", choices=["identity", "structural", "joint", "all"])
     parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--lr", type=float, default=5e-5)
     parser.add_argument("--margin", type=float, default=0.2)
-    parser.add_argument("--lambda", dest="lambda_constraint", type=float, default=0.5)
-    parser.add_argument("--device", type=str, default=None, choices=["cuda", "cpu"])
-    parser.add_argument("--save", type=str, default=None)
-
-    # Text encoder arguments
-    parser.add_argument("--encoder", type=str, default="BAAI/bge-large-en-v1.5",
-                        help="HuggingFace model name for text encoder")
-    parser.add_argument("--finetune", type=str, default="lora",
-                        choices=["full", "lora", "frozen"],
-                        help="Fine-tuning strategy for text encoder")
-    parser.add_argument("--lora-r", type=int, default=16,
-                        help="LoRA rank (only used when --finetune=lora)")
-    parser.add_argument("--lora-alpha", type=int, default=32,
-                        help="LoRA alpha (only used when --finetune=lora)")
-    parser.add_argument("--preset", type=str, default=None,
-                        choices=list(ENCODER_PRESETS.keys()),
-                        help="Hardware preset overriding encoder/finetune/batch-size")
-    parser.add_argument("--gradient-checkpointing", action="store_true",
-                        help="Enable gradient checkpointing to save VRAM")
-
-    # Architecture version flags
-    parser.add_argument(
-        "--contr1", type=str, default="v1", choices=["v1", "v2"],
-        help="Numeric encoding version: v1=log-scale [4 features], v2=ScaleAwareNumericEncoder "
-             "(magnitude bin + mantissa + unit). Default: v1. "
-             "P0 improvement: v2 handles mixed-scale financial tables better."
-    )
-    parser.add_argument(
-        "--contr2", type=str, default="v1", choices=["v1", "v2"],
-        help="Constraint scoring version: v1=fixed epsilon, v2=relative tolerance. Default: v1. "
-             "P2 improvement: v2 scales tolerance with |value|, fixing the bug where "
-             "large-value tables (|v|=1e12) get near-perfect scores for large absolute errors."
-    )
-
+    parser.add_argument("--lambda-constraint", type=float, default=0.5)
+    parser.add_argument("--lambda-entity", type=float, default=0.5)
+    parser.add_argument("--device", default=None)
+    parser.add_argument("--save", default=None)
+    parser.add_argument("--encoder", default="BAAI/bge-large-en-v1.5")
+    parser.add_argument("--finetune", default="lora", choices=["full", "lora", "frozen"])
+    parser.add_argument("--lora-r", type=int, default=16)
+    parser.add_argument("--lora-alpha", type=int, default=32)
+    parser.add_argument("--entity-dim", type=int, default=256)
+    parser.add_argument("--preset", default=None, choices=list(ENCODER_PRESETS.keys()))
+    parser.add_argument("--gradient-checkpointing", action="store_true")
+    parser.add_argument("--contr1", default="v1", choices=["v1", "v2"])
+    parser.add_argument("--contr2", default="v1", choices=["v1", "v2"])
+    parser.add_argument("--add-entity-sim", action="store_true",
+                        help="Enable EntitySim in GAT attention")
     args = parser.parse_args()
 
-    # Apply hardware preset if specified
     if args.preset:
-        preset = ENCODER_PRESETS[args.preset]
-        args.encoder = preset["encoder"]
-        args.finetune = preset["finetune"]
-        args.batch_size = preset["batch_size"]
-        logger.info(f"Applied preset '{args.preset}': {preset}")
+        p = ENCODER_PRESETS[args.preset]
+        args.encoder, args.finetune, args.batch_size = p["encoder"], p["finetune"], p["batch_size"]
+        logger.info(f"Preset '{args.preset}': {p}")
 
     device = torch.device(args.device or ("cuda" if torch.cuda.is_available() else "cpu"))
     logger.info(f"Device: {device}")
 
     samples = load_training_data(args.dataset, split="train")
 
-    # Initialize text encoder with gradient flow
-    text_encoder = TextEncoder(
-        model_name=args.encoder,
-        finetune=args.finetune,
-        lora_r=args.lora_r,
-        lora_alpha=args.lora_alpha,
-        max_length=512,
+    encoder = build_encoder(
+        model_name=args.encoder, finetune=args.finetune,
+        lora_r=args.lora_r, lora_alpha=args.lora_alpha, entity_dim=args.entity_dim,
     ).to(device)
 
-    if args.gradient_checkpointing and hasattr(text_encoder.backbone, "gradient_checkpointing_enable"):
-        text_encoder.backbone.gradient_checkpointing_enable()
+    if args.gradient_checkpointing and hasattr(encoder.backbone, "gradient_checkpointing_enable"):
+        encoder.backbone.gradient_checkpointing_enable()
         logger.info("Gradient checkpointing enabled")
 
-    embed_dim = text_encoder.embed_dim
-
-    # Initialize models — dimensions adapt to chosen encoder
+    embed_dim = encoder.embed_dim
     numeric_mod, _ = build_numeric_encoder(args.contr1, embed_dim)
     gat_encoder = GATEncoder(
         embed_dim=embed_dim, hidden_dim=256, num_heads=4, num_layers=2,
         numeric_encoder=numeric_mod, numeric_version=args.contr1,
+        entity_embed_dim=args.entity_dim, add_entity_sim=args.add_entity_sim,
     ).to(device)
-    logger.info(f"Numeric encoder: contr1={args.contr1}, "
-                f"encoder_module={'ScaleAwareNumericEncoder' if numeric_mod is not None else 'log-scale'}")
 
     scorer = JointScorer(
-        text_embed_dim=embed_dim, kg_embed_dim=256, entity_feat_dim=3, hidden_dim=64,
+        text_embed_dim=embed_dim, kg_embed_dim=gat_encoder.output_dim,
+        entity_embed_dim=args.entity_dim, hidden_dim=64,
     ).to(device)
 
+    entity_registry = EntityRegistry()
     save_path = Path(args.save) if args.save else Path(f"outputs/gsr_training/{args.dataset}")
 
-    # Log trainable parameter summary
-    enc_params = sum(p.numel() for p in text_encoder.parameters() if p.requires_grad)
+    enc_params = sum(p.numel() for p in encoder.parameters() if p.requires_grad)
     gat_params = sum(p.numel() for p in gat_encoder.parameters() if p.requires_grad)
     sc_params = sum(p.numel() for p in scorer.parameters() if p.requires_grad)
-    total_params = enc_params + gat_params + sc_params
     logger.info(
-        f"Trainable params: TextEncoder={enc_params:,} + GAT={gat_params:,} + "
-        f"Scorer={sc_params:,} = {total_params:,} total"
+        f"Trainable params: SharedEncoder={enc_params:,} + GAT={gat_params:,} + "
+        f"Scorer={sc_params:,} = {enc_params+gat_params+sc_params:,}"
     )
 
     if args.stage in ("identity", "all"):
-        stage_identity(text_encoder, scorer, gat_encoder, samples, device,
-                       epochs=args.epochs, lr=args.lr, batch_size=args.batch_size)
+        stage_identity(encoder, scorer, gat_encoder, samples, device, entity_registry,
+                       epochs=args.epochs, lr=args.lr, batch_size=args.batch_size, entity_dim=args.entity_dim)
 
     if args.stage in ("structural", "all"):
-        stage_structural(text_encoder, scorer, gat_encoder, samples, device,
-                         epochs=args.epochs, lr=args.lr, batch_size=args.batch_size,
-                         contr_version=args.contr2)
+        stage_structural(encoder, scorer, gat_encoder, samples, device,
+                        epochs=args.epochs, lr=args.lr, batch_size=args.batch_size,
+                        contr_version=args.contr2, entity_dim=args.entity_dim)
 
     if args.stage in ("joint", "all"):
-        stage_joint(
-            text_encoder, scorer, gat_encoder, samples, device,
-            epochs=args.epochs, batch_size=args.batch_size,
-            lr=args.lr, margin=args.margin,
-            lambda_constraint=args.lambda_constraint,
-            save_path=save_path,
-            contr_version=args.contr2,
-        )
-    logger.info(f"Constraint scoring version (contr2): {args.contr2}")
+        stage_joint(encoder, scorer, gat_encoder, samples, device, entity_registry,
+                    epochs=args.epochs, batch_size=args.batch_size, lr=args.lr, margin=args.margin,
+                    lambda_constraint=args.lambda_constraint, lambda_entity=args.lambda_entity,
+                    save_path=save_path, contr_version=args.contr2, entity_dim=args.entity_dim,
+                    add_entity_sim=args.add_entity_sim)
 
     save_path.mkdir(parents=True, exist_ok=True)
     torch.save({
-        "text_encoder_state": text_encoder.state_dict(),
-        "scorer_state": scorer.state_dict(),
+        "encoder_state": encoder.state_dict(), "scorer_state": scorer.state_dict(),
         "gat_encoder_state": gat_encoder.state_dict(),
-        "encoder_model_name": args.encoder,
-        "finetune_strategy": args.finetune,
-        "embed_dim": embed_dim,
+        "encoder_model_name": args.encoder, "finetune_strategy": args.finetune,
+        "embed_dim": embed_dim, "entity_dim": args.entity_dim,
     }, save_path / "final_model.pt")
     logger.info(f"Model saved to {save_path / 'final_model.pt'}")
 
