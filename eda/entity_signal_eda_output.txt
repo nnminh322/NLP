@@ -1,0 +1,360 @@
+================================================================================
+Across FinQA, TAT-DQA, ConvFinQA
+================================================================================
+
+LOADING DATASETS...
+  FinQA loaded: 8281 total samples
+  ConvFinQA loaded: 3458 samples (turn_0)
+  TAT-DQA loaded: 11349 total samples
+
+================================================================================
+  DATASET: FinQA  (n=8281)
+================================================================================
+
+── METADATA FORM ──
+  Explicit metadata columns found: ['company_name', 'company_symbol', 'report_year', 'company_sector', 'company_industry', 'company_headquarters', 'company_cik']
+  Total columns: 21
+  Column names: ['id', 'context_id', 'split', 'question', 'program_answer', 'original_answer', 'context', 'table', 'pre_text', 'post_text', 'file_name', 'company_name', 'company_symbol', 'report_year', 'page_number', 'company_sector', 'company_industry', 'company_headquarters', 'company_date_added', 'company_cik', 'company_founded']
+  Queries with company_name embedded in text: 7459/8281 (90.1%)
+
+── ENTITY CO-REFERENCE ANALYSIS ──
+  Documents with company_name (metadata): 8281/8281 (100.0%)
+  Documents with report_year (metadata): 8281/8281 (100.0%)
+  Documents with company_sector (metadata): 8281/8281 (100.0%)
+  Documents with company_symbol (metadata): 8281/8281 (100.0%)
+  Queries with TICKER symbols (e.g. AAPL): 1583/8281 (19.1%)
+  Queries with YEAR references: 8136/8281 (98.2%)
+  Queries with QUARTER references: 209/8281 (2.5%)
+  Queries with SAME entity referenced in text: 7553/8281 (91.2%)
+  Queries with full company names: 6045/8281 (73.0%)
+
+── TABLE PRESENCE ──
+  Documents with TABLE in context: 8281/8281 (100.0%)
+    Avg tables per document: 0.02
+    Median tables per document: 0
+    Max tables per document: 1
+  Documents with separate `table` column: 0/8281 (0.0%)
+  Queries with TABLE in question text: 0/8281 (0.0%)
+  Queries with TABLE-RELATED language: 4812/8281 (58.1%)
+
+── ACCOUNTING EQUATION / IDENTITY PRESENCE ──
+  Documents with accounting identities: 4148/8281 (50.1%)
+  Top accounting patterns found:
+    cash flow: 1999 (24.1%)
+    net income pattern: 1185 (14.3%)
+    operating income: 629 (7.6%)
+    working capital: 503 (6.1%)
+    totaling: 383 (4.6%)
+    difference operation: 248 (3.0%)
+    EPS: 242 (2.9%)
+    retained earnings: 214 (2.6%)
+    averaging: 202 (2.4%)
+    summation: 192 (2.3%)
+  Queries with accounting identities: 866/8281 (10.5%)
+  Top accounting patterns in queries:
+    cash flow: 187 (2.3%)
+    operating income: 161 (1.9%)
+    net income pattern: 152 (1.8%)
+    difference operation: 95 (1.1%)
+    ROI: 66 (0.8%)
+    averaging: 49 (0.6%)
+    EPS: 39 (0.5%)
+    totaling: 37 (0.4%)
+    working capital: 19 (0.2%)
+    summation: 19 (0.2%)
+  Queries with 'add' operation: 5/8281 (0.1%)
+  Queries with 'subtract' operation: 1/8281 (0.0%)
+  Queries with 'multiply' operation: 2/8281 (0.0%)
+  Queries with 'sum' operation: 19/8281 (0.2%)
+  Queries with 'total' operation: 3164/8281 (38.2%)
+  Queries with 'average' operation: 923/8281 (11.1%)
+  Queries with 'difference' operation: 291/8281 (3.5%)
+  Queries with 'change' operation: 1708/8281 (20.6%)
+
+── QUESTION TYPE DISTRIBUTION ──
+  how_much/many: 155/8281 (1.9%)
+  percentage/ratio: 1342/8281 (16.2%)
+  change/difference: 3042/8281 (36.7%)
+  compare: 41/8281 (0.5%)
+  calculate: 11/8281 (0.1%)
+  total/sum: 3230/8281 (39.0%)
+  average/mean: 922/8281 (11.1%)
+  year_ref: 8136/8281 (98.2%)
+
+── SAMPLE EXAMPLES ──
+
+  [Sample 0] FinQA
+  Question: What was Analog Devices reported interest expense for fiscal year 2009, as listed in its annual report?
+  Company: Analog Devices (ADI)
+  Year: 2009
+  Sector: Information Technology
+  Context has accounting eq: True
+  Context preview: interest rate to a variable interest rate based on the three-month libor plus 2.05% ( 2.05 % ) ( 2.34% ( 2.34 % ) as of october 31 , 2009 ) .
+if libor changes by 100 basis points , our annual interest
+
+  [Sample 1] FinQA
+  Question: During the fiscal year ended March 31, 2012, for Abiomed, Inc., did the stock-based compensation expense of $3.3 million for equity awards where presc
+  Company: Abiomed, Inc. (ABMD)
+  Year: 2012
+  Sector: Healthcare
+  Context has accounting eq: False
+  Context preview: abiomed , inc .
+and subsidiaries notes to consolidated financial statements 2014 ( continued ) note 8 .
+stock award plans and stock-based compensation ( continued ) restricted stock and restricted sto
+
+  [Sample 2] FinQA
+  Question: What were the total operating expenses for American Airlines Group in 2018, as reflected in the table detailing annual aircraft fuel consumption and c
+  Company: American Airlines Group (AAL)
+  Year: 2018
+  Sector: Industrials
+  Context has accounting eq: False
+  Context preview: the following table shows annual aircraft fuel consumption and costs , including taxes , for our mainline and regional operations for 2018 , 2017 and 2016 ( gallons and aircraft fuel expense in millio
+
+================================================================================
+  DATASET: ConvFinQA  (n=3458)
+================================================================================
+
+── METADATA FORM ──
+  Explicit metadata columns found: ['company_name', 'company_symbol', 'report_year', 'company_sector', 'company_industry', 'company_headquarters', 'company_cik']
+  Total columns: 21
+  Column names: ['id', 'context_id', 'split', 'question', 'program_answer', 'original_answer', 'context', 'table', 'pre_text', 'post_text', 'file_name', 'company_name', 'company_symbol', 'report_year', 'page_number', 'company_sector', 'company_industry', 'company_headquarters', 'company_date_added', 'company_cik', 'company_founded']
+  Queries with company_name embedded in text: 3069/3458 (88.8%)
+
+── ENTITY CO-REFERENCE ANALYSIS ──
+  Documents with company_name (metadata): 3458/3458 (100.0%)
+  Documents with report_year (metadata): 3458/3458 (100.0%)
+  Documents with company_sector (metadata): 3458/3458 (100.0%)
+  Documents with company_symbol (metadata): 3458/3458 (100.0%)
+  Queries with TICKER symbols (e.g. AAPL): 580/3458 (16.8%)
+  Queries with YEAR references: 3400/3458 (98.3%)
+  Queries with QUARTER references: 50/3458 (1.4%)
+  Queries with SAME entity referenced in text: 3118/3458 (90.2%)
+  Queries with full company names: 2473/3458 (71.5%)
+
+── TABLE PRESENCE ──
+  Documents with TABLE in context: 3458/3458 (100.0%)
+    Avg tables per document: 1.00
+    Median tables per document: 1
+    Max tables per document: 1
+  Documents with separate `table` column: 0/3458 (0.0%)
+  Queries with TABLE in question text: 0/3458 (0.0%)
+  Queries with TABLE-RELATED language: 1523/3458 (44.0%)
+
+── ACCOUNTING EQUATION / IDENTITY PRESENCE ──
+  Documents with accounting identities: 1812/3458 (52.4%)
+  Top accounting patterns found:
+    cash flow: 859 (24.8%)
+    net income pattern: 503 (14.5%)
+    operating income: 296 (8.6%)
+    working capital: 221 (6.4%)
+    totaling: 168 (4.9%)
+    EPS: 114 (3.3%)
+    difference operation: 108 (3.1%)
+    averaging: 99 (2.9%)
+    summation: 83 (2.4%)
+    book value: 76 (2.2%)
+  Queries with accounting identities: 434/3458 (12.6%)
+  Top accounting patterns in queries:
+    totaling: 92 (2.7%)
+    operating income: 69 (2.0%)
+    summation: 65 (1.9%)
+    cash flow: 60 (1.7%)
+    net income pattern: 58 (1.7%)
+    difference operation: 45 (1.3%)
+    EPS: 20 (0.6%)
+    ROI: 11 (0.3%)
+    EBIT: 10 (0.3%)
+    EBITDA: 5 (0.1%)
+  Queries with 'add' operation: 4/3458 (0.1%)
+  Queries with 'subtract' operation: 2/3458 (0.1%)
+  Queries with 'multiply' operation: 6/3458 (0.2%)
+  Queries with 'sum' operation: 67/3458 (1.9%)
+  Queries with 'total' operation: 1079/3458 (31.2%)
+  Queries with 'average' operation: 184/3458 (5.3%)
+  Queries with 'difference' operation: 213/3458 (6.2%)
+  Queries with 'change' operation: 616/3458 (17.8%)
+
+── QUESTION TYPE DISTRIBUTION ──
+  how_much/many: 57/3458 (1.6%)
+  percentage/ratio: 312/3458 (9.0%)
+  change/difference: 1031/3458 (29.8%)
+  compare: 9/3458 (0.3%)
+  calculate: 2/3458 (0.1%)
+  total/sum: 1159/3458 (33.5%)
+  average/mean: 183/3458 (5.3%)
+  year_ref: 3400/3458 (98.3%)
+
+── SAMPLE EXAMPLES ──
+
+  [Sample 0] ConvFinQA
+  Question: What was the net cash from operating activities for Jack Henry & Associates in the fiscal year ended June 30, 2009, as reported in their 2009 annual r
+  Company: Jack Henry & Associates (JKHY)
+  Year: 2009
+  Sector: Financials
+  Context has accounting eq: True
+  Context preview: 26 | 2009 annual report in fiscal 2008 , revenues in the credit union systems and services business segment increased 14% ( 14 % ) from fiscal 2007 . all revenue components within the segment experien
+
+  [Sample 1] ConvFinQA
+  Question: What were the revenues for Republic Services in 2008, as reflected in the unaudited pro forma financial information?
+  Company: Republic Services (RSG)
+  Year: 2008
+  Sector: Industrials
+  Context has accounting eq: True
+  Context preview: substantially all of the goodwill and other intangible assets recorded related to the acquisition of allied are not deductible for tax purposes . pro forma information the consolidated financial state
+
+  [Sample 2] ConvFinQA
+  Question: What was the total of net sales for Apple Inc. in 2001, as reported in the 2002 financial year?
+  Company: Apple Inc. (AAPL)
+  Year: 2002
+  Sector: Information Technology
+  Context has accounting eq: False
+  Context preview: in a new business model such as the retail segment is inherently risky , particularly in light of the significant investment involved , the current economic climate , and the fixed nature of a substan
+
+================================================================================
+  DATASET: TAT-DQA  (n=11349)
+================================================================================
+
+── METADATA FORM ──
+  Explicit metadata columns found: ['company_name', 'report_year', 'company_sector']
+  Total columns: 11
+  Column names: ['id', 'context_id', 'split', 'question', 'program_answer', 'original_answer', 'context', 'file_name', 'company_name', 'report_year', 'company_sector']
+  Queries with company_name embedded in text: 2799/11349 (24.7%)
+
+── ENTITY CO-REFERENCE ANALYSIS ──
+  Documents with company_name (metadata): 11349/11349 (100.0%)
+  Documents with report_year (metadata): 11349/11349 (100.0%)
+  Documents with company_sector (metadata): 9671/11349 (85.2%)
+  Queries with TICKER symbols (e.g. AAPL): 1722/11349 (15.2%)
+  Queries with YEAR references: 10903/11349 (96.1%)
+  Queries with QUARTER references: 227/11349 (2.0%)
+  Queries with SAME entity referenced in text: 11349/11349 (100.0%)
+  Queries with full company names: 6374/11349 (56.2%)
+
+── TABLE PRESENCE ──
+  Documents with TABLE in context: 11083/11349 (97.7%)
+    Avg tables per document: 2.17
+    Median tables per document: 2
+    Max tables per document: 15
+  Queries with TABLE in question text: 0/11349 (0.0%)
+  Queries with TABLE-RELATED language: 4694/11349 (41.4%)
+
+── ACCOUNTING EQUATION / IDENTITY PRESENCE ──
+  Documents with accounting identities: 6217/11349 (54.8%)
+  Top accounting patterns found:
+    cash flow: 2334 (20.6%)
+    net income pattern: 1801 (15.9%)
+    operating income: 1245 (11.0%)
+    EBIT: 850 (7.5%)
+    EPS: 842 (7.4%)
+    gross profit: 764 (6.7%)
+    working capital: 755 (6.7%)
+    EBITDA: 734 (6.5%)
+    totaling: 464 (4.1%)
+    difference operation: 409 (3.6%)
+  Queries with accounting identities: 1731/11349 (15.3%)
+  Top accounting patterns in queries:
+    net income pattern: 289 (2.5%)
+    averaging: 286 (2.5%)
+    cash flow: 206 (1.8%)
+    difference operation: 203 (1.8%)
+    EBIT: 170 (1.5%)
+    EBITDA: 162 (1.4%)
+    operating income: 162 (1.4%)
+    gross profit: 140 (1.2%)
+    summation: 130 (1.1%)
+    EPS: 98 (0.9%)
+  Queries with 'add' operation: 17/11349 (0.1%)
+  Queries with 'subtract' operation: 2/11349 (0.0%)
+  Queries with 'sum' operation: 133/11349 (1.2%)
+  Queries with 'total' operation: 2432/11349 (21.4%)
+  Queries with 'average' operation: 1602/11349 (14.1%)
+  Queries with 'difference' operation: 597/11349 (5.3%)
+  Queries with 'change' operation: 2843/11349 (25.1%)
+
+── QUESTION TYPE DISTRIBUTION ──
+  how_much/many: 457/11349 (4.0%)
+  percentage/ratio: 811/11349 (7.1%)
+  change/difference: 4691/11349 (41.3%)
+  compare: 128/11349 (1.1%)
+  calculate: 23/11349 (0.2%)
+  total/sum: 2565/11349 (22.6%)
+  average/mean: 1603/11349 (14.1%)
+  year_ref: 10903/11349 (96.1%)
+
+── SAMPLE EXAMPLES ──
+
+  [Sample 0] TAT-DQA
+  Question: What was the amount of Income before income taxes for carpenter-technology-corp in the year ended June 30, 2019?
+  Company: carpenter-technology-corp (N/A)
+  Year: 2019
+  Sector: Specialty Metals
+  Context has accounting eq: False
+  Context preview: The changes in AOCI associated with derivative hedging activities during the years ended June 30, 2019, 2018 and 2017 were as follows:
+
+| ($ in millions) | 2019          | 2018       | 2017       |
+|-
+
+  [Sample 1] TAT-DQA
+  Question: What was the amount of Domestic Income before income taxes for Carpenter Technology Corp in 2018?
+  Company: carpenter-technology-corp (N/A)
+  Year: 2019
+  Sector: Specialty Metals
+  Context has accounting eq: False
+  Context preview: The changes in AOCI associated with derivative hedging activities during the years ended June 30, 2019, 2018 and 2017 were as follows:
+
+| ($ in millions) | 2019          | 2018       | 2017       |
+|-
+
+  [Sample 2] TAT-DQA
+  Question: In the income before income taxes table for Carpenter Technology Corp's 2019 report, during which year did Foreign reach its highest value?
+  Company: carpenter-technology-corp (N/A)
+  Year: 2019
+  Sector: Specialty Metals
+  Context has accounting eq: False
+  Context preview: The changes in AOCI associated with derivative hedging activities during the years ended June 30, 2019, 2018 and 2017 were as follows:
+
+| ($ in millions) | 2019          | 2018       | 2017       |
+|-
+
+================================================================================
+CROSS-DATASET SUMMARY
+================================================================================
+
+  Dataset     N Doc has company (meta) Doc has year (meta) Doc has sector (meta) Query has ticker Query has year Query has company name Doc has table Query has table Doc has accounting eq Query has accounting eq
+    FinQA  8281                   100%                100%                  100%              19%            98%                    90%          100%              0%                   50%                     10%
+ConvFinQA  3458                   100%                100%                  100%              17%            98%                    89%          100%              0%                   52%                     13%
+  TAT-DQA 11349                   100%                100%                   85%              15%            96%                    25%           98%              0%                   55%                     15%
+
+================================================================================
+KEY INSIGHTS FOR GSR-CACL DESIGN
+================================================================================
+
+1. METADATA FORM:
+   - ALL 3 datasets have EXPLICIT metadata columns (company_name, report_year, sector)
+   - Query text EMBEDS company name as prefix in some cases
+   - Entity resolution: need to handle "AAPL" vs "Apple Inc." vs "Apple"
+
+2. ENTITY CO-REFERENCE:
+   - Documents: 100% have company metadata (explicit)
+   - Queries: variable — some have ticker, some have full name, some implicit
+   - Challenge: queries may reference entities DIFFERENTLY from document metadata
+   - GSR-CACL EntitySignal is VALID: both Q and D have entity metadata
+
+3. TABLE PRESENCE:
+   - Documents: HIGH table density (most have markdown tables)
+   - Queries: mostly NO table in query text (query asks about table content)
+   - GSR-CACL StructuralSignal is VALID for documents, NOT needed for queries
+
+4. ACCOUNTING EQUATIONS:
+   - Documents: high frequency of accounting terminology (EBITDA, revenue, etc.)
+   - Queries: computation keywords present (add, subtract, divide, total, etc.)
+   - GSR-CACL ConstraintScore is VALID for documents with tables
+
+5. IMPLICATION FOR ARCHITECTURE:
+   - Entity signal: BOTH Q and D have metadata → use EntitySignal for BOTH
+   - Structural signal: Only D has tables → use StructuralSignal for D only
+   - Query may NOT have table → GAT encoding only for document tables
+   - EntitySupConLoss essential for resolving "AAPL" ↔ "Apple Inc."
+        
+
+Output saved to: /Users/nnminh322/Library/Mobile Documents/com~apple~CloudDocs/Thạc sĩ/Xử lý ngôn ngữ tự nhiên/project/eda/entity_signal_eda_output.txt

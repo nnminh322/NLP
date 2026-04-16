@@ -2,1054 +2,433 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GSR-CACL Architecture — Figure 1</title>
+<title>Figure 1 — GSR-CACL</title>
 <style>
-  :root {
-    --bg: #ffffff;
-    --panel-bg: #f8f9fa;
-    --border: #dee2e6;
-    --text: #1a1a2e;
-    --text-muted: #6c757d;
-    --accent-blue: #3b82f6;
-    --accent-purple: #8b5cf6;
-    --accent-green: #10b981;
-    --accent-orange: #f59e0b;
-    --accent-red: #ef4444;
-    --contrib1: #2563eb;
-    --contrib2: #7c3aed;
-    --contrib3: #059669;
-    --loss-color: #dc2626;
-    --font-main: 'Segoe UI', system-ui, -apple-system, sans-serif;
-    --font-math: 'Cambria Math', 'STIX Two Text', Georgia, serif;
-    --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
-    --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
-    --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
-  }
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
+  * { margin:0; padding:0; box-sizing:border-box; }
   body {
-    background: var(--bg);
-    font-family: var(--font-main);
-    color: var(--text);
-    line-height: 1.5;
-    padding: 32px;
+    background:#f5f5f5;
+    display:flex; justify-content:center; padding:28px 16px;
+    font-family: 'Georgia','Times New Roman', serif;
   }
-
-  figure {
-    max-width: 1200px;
-    margin: 0 auto;
+  .page {
+    background:white; width:1000px; padding:22px 26px 16px;
+    box-shadow:0 1px 8px rgba(0,0,0,.12);
   }
-
-  figcaption {
-    text-align: center;
-    font-size: 13px;
-    color: var(--text-muted);
-    margin-top: 16px;
-    font-style: italic;
+  .caption {
+    font-size:9.5pt; line-height:1.6; color:#222; margin-top:10px;
+    text-align:justify; border-top:1px solid #bbb; padding-top:7px;
   }
-
-  .arch-container {
-    position: relative;
-    background: var(--bg);
-    border: 1.5px solid var(--border);
-    border-radius: 12px;
-    padding: 32px 24px;
-    overflow: hidden;
-  }
-
-  .arch-title {
-    text-align: center;
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: 0.3px;
-    margin-bottom: 24px;
-    color: var(--text);
-  }
-
-  .arch-title span {
-    font-size: 11px;
-    font-weight: 400;
-    color: var(--text-muted);
-    display: block;
-    margin-top: 2px;
-  }
-
-  /* SVG Overlay for arrows */
-  .arrows-svg {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    pointer-events: none;
-    z-index: 10;
-  }
-
-  /* Grid Layout */
-  .grid {
-    display: grid;
-    grid-template-columns: 160px 220px 1fr 220px 160px;
-    grid-template-rows: auto;
-    gap: 0 12px;
-    align-items: center;
-    position: relative;
-    z-index: 1;
-  }
-
-  /* Columns */
-  .col-input { grid-column: 1; }
-  .col-text  { grid-column: 2; }
-  .col-center { grid-column: 3; }
-  .col-scorer { grid-column: 4; }
-  .col-output { grid-column: 5; }
-
-  /* Rows for center section */
-  .row-doc   { grid-row: 1; }
-  .row-query { grid-row: 2; }
-  .row-meta  { grid-row: 3; }
-  .row-table { grid-row: 4; }
-  .row-kg    { grid-row: 5; }
-  .row-chap  { grid-row: 6; }
-
-  .spacer-row { grid-row: span 6; }
-
-  /* Input boxes */
-  .box {
-    border-radius: 8px;
-    padding: 10px 14px;
-    font-size: 12px;
-    line-height: 1.4;
-    text-align: center;
-    position: relative;
-  }
-
-  .box-doc {
-    background: #eff6ff;
-    border: 1.5px solid #bfdbfe;
-    color: #1e40af;
-  }
-
-  .box-query {
-    background: #faf5ff;
-    border: 1.5px solid #e9d5ff;
-    color: #6d28d9;
-  }
-
-  .box-meta {
-    background: #f0fdf4;
-    border: 1.5px solid #bbf7d0;
-    color: #15803d;
-  }
-
-  .box-table {
-    background: #fffbeb;
-    border: 1.5px solid #fde68a;
-    color: #92400e;
-  }
-
-  .box-label {
-    font-size: 9px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    opacity: 0.7;
-    margin-bottom: 4px;
-  }
-
-  .box-val {
-    font-family: var(--font-main);
-    font-size: 11px;
-    font-weight: 500;
-  }
-
-  /* Encoder boxes */
-  .encoder-box {
-    background: white;
-    border-radius: 10px;
-    padding: 14px 12px;
-    text-align: center;
-    box-shadow: var(--shadow-md);
-    position: relative;
-    transition: box-shadow 0.2s;
-  }
-
-  .encoder-box:hover {
-    box-shadow: var(--shadow-lg);
-  }
-
-  .encoder-box .box-label {
-    font-size: 9px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    opacity: 0.6;
-    margin-bottom: 6px;
-  }
-
-  .encoder-name {
-    font-size: 13px;
-    font-weight: 700;
-    margin-bottom: 4px;
-  }
-
-  .encoder-sub {
-    font-size: 10px;
-    color: var(--text-muted);
-    margin-bottom: 8px;
-  }
-
-  .encoder-detail {
-    font-size: 10px;
-    color: var(--text-muted);
-    background: var(--panel-bg);
-    border-radius: 4px;
-    padding: 4px 6px;
-    font-family: 'Courier New', monospace;
-  }
-
-  .text-encoder .encoder-name { color: var(--accent-blue); }
-  .text-encoder { border: 2px solid var(--accent-blue); }
-  .text-encoder .contrib-tag { background: #dbeafe; color: #1e40af; }
-
-  .entity-encoder .encoder-name { color: var(--contrib2); }
-  .entity-encoder { border: 2px solid var(--contrib2); }
-  .entity-encoder .contrib-tag { background: #ede9fe; color: #6d28d9; }
-
-  .gat-encoder .encoder-name { color: var(--contrib1); }
-  .gat-encoder { border: 2px solid var(--contrib1); }
-  .gat-encoder .contrib-tag { background: #dbeafe; color: #1e40af; }
-
-  .template-box {
-    background: #fffbeb;
-    border: 1.5px solid #fde68a;
-    border-radius: 8px;
-    padding: 10px 12px;
-    text-align: center;
-    font-size: 11px;
-    color: #92400e;
-    font-weight: 600;
-  }
-
-  .scorer-box {
-    background: white;
-    border-radius: 10px;
-    padding: 14px 12px;
-    text-align: center;
-    box-shadow: var(--shadow-md);
-    border: 2px solid var(--contrib3);
-    position: relative;
-  }
-
-  .scorer-box .box-label {
-    font-size: 9px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    opacity: 0.6;
-    margin-bottom: 6px;
-  }
-
-  .scorer-name { font-size: 13px; font-weight: 700; color: var(--contrib3); margin-bottom: 6px; }
-
-  .scorer-inputs {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin-bottom: 8px;
-  }
-
-  .scorer-input-row {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    font-size: 10px;
-    color: var(--text-muted);
-  }
-
-  .scorer-input-row .arrow-in {
-    color: var(--accent-blue);
-    font-weight: 700;
-  }
-
-  .contrib-tag {
-    display: inline-block;
-    font-size: 8px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-    padding: 2px 5px;
-    border-radius: 3px;
-    margin-bottom: 4px;
-  }
-
-  /* Output */
-  .output-box {
-    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-    border: 2px solid var(--accent-green);
-    border-radius: 10px;
-    padding: 14px 12px;
-    text-align: center;
-    box-shadow: var(--shadow-md);
-  }
-
-  .output-name {
-    font-size: 14px;
-    font-weight: 700;
-    color: #15803d;
-    margin-bottom: 4px;
-  }
-
-  .output-formula {
-    font-family: var(--font-math);
-    font-size: 11px;
-    color: #166534;
-    background: #dcfce7;
-    border-radius: 4px;
-    padding: 4px 8px;
-    display: inline-block;
-  }
-
-  /* Training / Loss section */
-  .loss-section {
-    margin-top: 24px;
-    border-top: 1.5px dashed var(--border);
-    padding-top: 20px;
-  }
-
-  .loss-section-title {
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: var(--loss-color);
-    margin-bottom: 12px;
-    text-align: center;
-  }
-
-  .loss-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-  }
-
-  .loss-box {
-    background: #fef2f2;
-    border: 1.5px solid #fecaca;
-    border-radius: 8px;
-    padding: 10px 12px;
-    text-align: center;
-  }
-
-  .loss-name {
-    font-size: 11px;
-    font-weight: 700;
-    color: #991b1b;
-    margin-bottom: 3px;
-  }
-
-  .loss-desc {
-    font-size: 9px;
-    color: #b91c1c;
-    opacity: 0.8;
-  }
-
-  /* Legend */
-  .legend {
-    display: flex;
-    justify-content: center;
-    gap: 24px;
-    margin-top: 20px;
-    flex-wrap: wrap;
-  }
-
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 10px;
-    color: var(--text-muted);
-  }
-
-  .legend-line {
-    width: 28px;
-    height: 2px;
-    border-radius: 1px;
-  }
-
-  .legend-line.forward {
-    background: var(--accent-blue);
-  }
-
-  .legend-line.backward {
-    background: var(--loss-color);
-    background: repeating-linear-gradient(
-      90deg,
-      var(--loss-color) 0px,
-      var(--loss-color) 4px,
-      transparent 4px,
-      transparent 8px
-    );
-    height: 2px;
-  }
-
-  .legend-line.grad {
-    background: var(--loss-color);
-    background: repeating-linear-gradient(
-      90deg,
-      var(--loss-color) 0px,
-      var(--loss-color) 3px,
-      transparent 3px,
-      transparent 6px
-    );
-    height: 2px;
-  }
-
-  .legend-line.chat {
-    background: var(--accent-orange);
-    background: repeating-linear-gradient(
-      90deg,
-      var(--accent-orange) 0px,
-      var(--accent-orange) 4px,
-      transparent 4px,
-      transparent 8px
-    );
-    height: 2px;
-  }
-
-  /* Shared backbone connector */
-  .shared-backbone-line {
-    position: absolute;
-    left: 195px;
-    top: 0;
-    width: 3px;
-    background: linear-gradient(180deg, var(--contrib2) 0%, var(--accent-blue) 100%);
-    border-radius: 2px;
-    z-index: 5;
-    opacity: 0.25;
-  }
-
-  /* Arrow labels on SVG */
-  .arrow-label {
-    font-size: 9px;
-    font-weight: 600;
-    fill: var(--text-muted);
-    font-family: var(--font-main);
-  }
-
-  .arrow-label-math {
-    font-family: var(--font-math);
-    font-size: 10px;
-    font-style: italic;
-  }
-
-  /* Color key dots */
-  .key-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-  }
-
-  .dot-c1 { background: var(--contrib1); }
-  .dot-c2 { background: var(--contrib2); }
-  .dot-c3 { background: var(--contrib3); }
-
-  .key-text { font-size: 10px; color: var(--text-muted); }
-
-  /* Zoom panel for GAT detail */
-  .gat-zoom {
-    position: absolute;
-    right: 20px;
-    top: 80px;
-    width: 220px;
-    background: white;
-    border: 1.5px solid var(--contrib1);
-    border-radius: 8px;
-    padding: 10px;
-    box-shadow: var(--shadow-md);
-    z-index: 20;
-  }
-
-  .gat-zoom-title {
-    font-size: 9px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-    color: var(--contrib1);
-    margin-bottom: 8px;
-    text-align: center;
-  }
-
-  .gat-mini-graph {
-    background: #eff6ff;
-    border-radius: 4px;
-    padding: 6px;
-    margin-bottom: 6px;
-  }
-
-  .gat-node {
-    fill: white;
-    stroke: var(--contrib1);
-    stroke-width: 1.5;
-  }
-
-  .gat-edge-normal {
-    stroke: #93c5fd;
-    stroke-width: 1.5;
-  }
-
-  .gat-edge-add {
-    stroke: #16a34a;
-    stroke-width: 2;
-    stroke-dasharray: none;
-  }
-
-  .gat-edge-sub {
-    stroke: #dc2626;
-    stroke-width: 2;
-    stroke-dasharray: 4,2;
-  }
-
-  .gat-node-label {
-    font-size: 7px;
-    fill: #1e40af;
-    text-anchor: middle;
-    font-family: var(--font-main);
-  }
-
-  .gat-legend-mini {
-    display: flex;
-    justify-content: space-around;
-    font-size: 8px;
-    color: var(--text-muted);
-  }
-
-  /* Entity encoder mini detail */
-  .entity-zoom {
-    position: absolute;
-    left: 12px;
-    top: 120px;
-    width: 140px;
-    background: white;
-    border: 1.5px solid var(--contrib2);
-    border-radius: 8px;
-    padding: 8px;
-    box-shadow: var(--shadow-md);
-    z-index: 20;
-  }
-
-  .entity-zoom-title {
-    font-size: 9px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-    color: var(--contrib2);
-    margin-bottom: 6px;
-    text-align: center;
-  }
-
-  .entity-branch {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 8px;
-    color: var(--text-muted);
-    margin-bottom: 3px;
-  }
-
-  .entity-branch-label {
-    background: #ede9fe;
-    color: #6d28d9;
-    padding: 1px 4px;
-    border-radius: 3px;
-    font-size: 7px;
-    font-weight: 700;
-  }
-
-  .entity-concat {
-    text-align: center;
-    font-size: 8px;
-    color: var(--contrib2);
-    font-weight: 700;
-    margin: 4px 0;
-  }
-
-  .entity-out {
-    text-align: center;
-    font-size: 8px;
-    background: #ede9fe;
-    color: #6d28d9;
-    padding: 3px 6px;
-    border-radius: 4px;
-    font-weight: 600;
-  }
+  .caption b { font-weight:700; }
 </style>
 </head>
 <body>
+<div class="page">
 
-<figure>
-<div class="arch-container" id="arch">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 450" style="width:100%;display:block;">
+<!--
+  Mathematically accurate architecture — based on source code analysis.
 
-  <!-- Shared Backbone visual line -->
-  <div class="shared-backbone-line" style="top:100px; height: 140px;"></div>
+  TEXT SIGNAL:
+    raw text → tokenizer → BGE backbone → [CLS] → LayerNorm → L2 normalize → q_text / d_text
 
-  <!-- Zoom panels -->
-  <div class="entity-zoom">
-    <div class="entity-zoom-title">C2 — EntityEncoder</div>
-    <div class="entity-branch">
-      <span class="entity-branch-label">COMPANY</span>
-      <span>→ BGE →</span>
-    </div>
-    <div class="entity-branch">
-      <span class="entity-branch-label">YEAR</span>
-      <span>→ BGE →</span>
-    </div>
-    <div class="entity-branch">
-      <span class="entity-branch-label">SECTOR</span>
-      <span>→ BGE →</span>
-    </div>
-    <div class="entity-concat">⊕ ⊕ → Proj → LN</div>
-    <div class="entity-out">e ∈ ℝ²⁵⁶</div>
-  </div>
+  ENTITY SIGNAL:
+    company → BGE → [CLS] ─┐
+    year    → BGE → [CLS] ─┤ concat → Linear(3d, d) → ReLU → Dropout → Linear(d, d_e) → LayerNorm → L2 → e_Q / e_D
 
-  <div class="gat-zoom">
-    <div class="gat-zoom-title">C1 — Entity-Aware GAT</div>
-    <svg class="gat-mini-graph" viewBox="0 0 200 80" xmlns="http://www.w3.org/2000/svg">
-      <!-- Nodes -->
-      <rect class="gat-node" x="15" y="28" width="30" height="24" rx="4"/>
-      <text class="gat-node-label" x="30" y="43">Rev</text>
+  JOINT SCORER:
+    s_text    = cos(q, d) × (0.5 + 0.5·σ(gate(q))) + 0.2·MLP([d_text ⊕ d_KG])
+    s_entity  = cos(e_Q, e_D)
+    s_struct  = MLP_cs([raw_cs, violated_ratio, edge_norm])
+    s(Q,D)    = α·s_text + β·s_entity + γ·s_struct
+-->
 
-      <rect class="gat-node" x="85" y="8" width="30" height="24" rx="4"/>
-      <text class="gat-node-label" x="100" y="23">COGS</text>
+<defs>
+  <marker id="a" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
+    <path d="M0,0 L0,5 L7,2.5z" fill="#888"/></marker>
+  <marker id="ab" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
+    <path d="M0,0 L0,5 L7,2.5z" fill="#1a4a8a"/></marker>
+  <marker id="ao" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
+    <path d="M0,0 L0,5 L7,2.5z" fill="#7a3500"/></marker>
+  <marker id="ag" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
+    <path d="M0,0 L0,5 L7,2.5z" fill="#1a5c3e"/></marker>
+  <marker id="av" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
+    <path d="M0,0 L0,5 L7,2.5z" fill="#4a2880"/></marker>
+  <marker id="ar" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
+    <path d="M0,0 L0,5 L7,2.5z" fill="#7a2520"/></marker>
+</defs>
 
-      <rect class="gat-node" x="85" y="48" width="30" height="24" rx="4"/>
-      <text class="gat-node-label" x="100" y="63">GP</text>
 
-      <rect class="gat-node" x="155" y="28" width="30" height="24" rx="4"/>
-      <text class="gat-node-label" x="170" y="43">e<sub>D</sub></text>
+<!-- ══════════════════════════════════════════════════
+     INPUTS
+══════════════════════════════════════════════════ -->
 
-      <!-- Edges -->
-      <line class="gat-edge-sub" x1="45" y1="38" x2="85" y2="18"/>
-      <line class="gat-edge-add" x1="45" y1="42" x2="85" y2="60"/>
-      <line class="gat-edge-add" x1="115" y1="58" x2="155" y2="38"/>
-      <line class="gat-edge-normal" x1="155" y1="48" x2="185" y2="38" stroke-dasharray="2,2" opacity="0.4"/>
+<!-- Query Q -->
+<rect x="4" y="10" width="94" height="52" rx="5" fill="#e8eff9" stroke="#3068b0" stroke-width="1.2"/>
+<text x="51" y="28" text-anchor="middle" font-size="9.5" font-weight="bold" fill="#0d2850">Query Q</text>
+<text x="51" y="41" text-anchor="middle" font-size="6.5" fill="#0d2850">text: "What is…"</text>
+<text x="51" y="53" text-anchor="middle" font-size="6.5" fill="#5a2800">meta: Apple·2023·Tech</text>
 
-      <!-- Omega labels -->
-      <text x="62" y="22" font-size="7" fill="#16a34a" font-weight="bold" font-family="var(--font-math)">ω=−1</text>
-      <text x="62" y="58" font-size="7" fill="#16a34a" font-weight="bold" font-family="var(--font-math)">ω=+1</text>
-      <text x="132" y="55" font-size="7" fill="#16a34a" font-weight="bold" font-family="var(--font-math)">ω=+1</text>
-    </svg>
-    <div class="gat-legend-mini">
-      <span>─ ω=+1 additive</span>
-      <span>┄ ω=−1 subtractive</span>
-    </div>
-  </div>
+<!-- Document D -->
+<rect x="4" y="76" width="94" height="100" rx="5" fill="#e8eff9" stroke="#3068b0" stroke-width="1.2"/>
+<text x="51" y="93" text-anchor="middle" font-size="9.5" font-weight="bold" fill="#0d2850">Document D</text>
+<text x="51" y="106" text-anchor="middle" font-size="6.5" fill="#0d2850">text: "In FY 2023…"</text>
+<text x="51" y="118" text-anchor="middle" font-size="6.5" fill="#5a2800">meta: Apple·2023·Tech</text>
 
-  <!-- Title -->
-  <div class="arch-title">
-    GSR-CACL: Graph-Structured Retrieval with Constraint-Aware Contrastive Learning
-    <span>Overall architecture — forward dataflow (solid) and training gradients (dashed)</span>
-  </div>
+<!-- Table T -->
+<rect x="10" y="126" width="82" height="42" rx="4" fill="#dff0e8" stroke="#267a5e" stroke-width=".9"/>
+<text x="51" y="140" text-anchor="middle" font-size="7" font-weight="bold" fill="#1a5040">Table T</text>
+<rect x="15" y="144" width="72" height="20" rx="2" fill="white" stroke="#bbb" stroke-width=".4"/>
+<line x1="15" y1="153" x2="87" y2="153" stroke="#ddd" stroke-width=".4"/>
+<line x1="50" y1="144" x2="50" y2="164" stroke="#ddd" stroke-width=".4"/>
+<text x="32" y="152" font-size="5" fill="#444" text-anchor="middle">Revenue</text>
+<text x="68" y="152" font-size="5" fill="#444" text-anchor="middle">COGS</text>
+<text x="32" y="162" font-size="5" fill="#222" text-anchor="middle">100M</text>
+<text x="68" y="162" font-size="5" fill="#222" text-anchor="middle">60M</text>
 
-  <!-- SVG Arrows -->
-  <svg class="arrows-svg" id="arrowsSvg" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <!-- Arrowhead markers -->
-      <marker id="arr-blue" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-        <path d="M0,0 L0,6 L6,3 z" fill="#3b82f6"/>
-      </marker>
-      <marker id="arr-purple" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-        <path d="M0,0 L0,6 L6,3 z" fill="#8b5cf6"/>
-      </marker>
-      <marker id="arr-green" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-        <path d="M0,0 L0,6 L6,3 z" fill="#10b981"/>
-      </marker>
-      <marker id="arr-orange" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-        <path d="M0,0 L0,6 L6,3 z" fill="#f59e0b"/>
-      </marker>
-      <marker id="arr-red" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-        <path d="M0,0 L0,6 L6,3 z" fill="#ef4444"/>
-      </marker>
-      <!-- Dashed patterns for gradients -->
-    </defs>
-  </svg>
 
-  <!-- Main Grid -->
-  <div class="grid" id="mainGrid">
+<!-- ══════════════════════════════════════════════════
+     BACKBONE  — ONE shared f_θ
+══════════════════════════════════════════════════ -->
 
-    <!-- Column 1: Inputs -->
-    <div class="col-input">
+<rect x="116" y="10" width="80" height="120" rx="6" fill="white" stroke="#444" stroke-width="1.4"/>
+<text x="156" y="40" text-anchor="middle" font-size="10.5" font-weight="bold" fill="#111">Backbone</text>
+<text x="156" y="56" text-anchor="middle" font-size="8" fill="#222" font-style="italic">f_θ</text>
+<line x1="126" y1="64" x2="186" y2="64" stroke="#e0e0e0" stroke-width=".6"/>
+<text x="156" y="80" text-anchor="middle" font-size="6.5" fill="#555">BGE / E5 /</text>
+<text x="156" y="91" text-anchor="middle" font-size="6.5" fill="#555">LLM2Vec</text>
+<text x="156" y="106" text-anchor="middle" font-size="6" fill="#999">(+ LoRA)</text>
+<text x="156" y="122" text-anchor="middle" font-size="5.5" fill="#aaa">shared θ</text>
 
-      <!-- Document -->
-      <div class="box box-doc row-doc" style="margin-bottom:12px;">
-        <div class="box-label">Document</div>
-        <div class="box-val" style="font-size:10px; text-align:left; margin-top:4px;">
-          <strong>Text:</strong> Annual report...<br>
-          <strong>Table:</strong> | Revenue | COGS | GP |<br>
-          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| 100K | 70K | 30K |<br>
-          <strong>Meta:</strong> Apple · 2023 · Tech
-        </div>
-      </div>
+<!-- Input → Backbone -->
+<line x1="98" y1="30" x2="114" y2="32" stroke="#1a4a8a" stroke-width="1.1" marker-end="url(#ab)"/>
+<text x="106" y="26" font-size="5.5" font-weight="bold" fill="#1a4a8a" text-anchor="middle">Q</text>
 
-      <!-- Query -->
-      <div class="box box-query" style="margin-bottom:12px;">
-        <div class="box-label">Query Q</div>
-        <div class="box-val">"What is Apple's<br>Gross Profit in 2023?"</div>
-      </div>
+<line x1="98" y1="93" x2="114" y2="50" stroke="#1a4a8a" stroke-width="1.1" marker-end="url(#ab)"/>
+<text x="100" y="78" font-size="5.5" font-weight="bold" fill="#1a4a8a">D</text>
 
-      <!-- Metadata -->
-      <div class="box box-meta" style="margin-bottom:12px;">
-        <div class="box-label">Entity Meta</div>
-        <div class="box-val" style="font-size:10px;">
-          Apple · 2023 · Technology
-        </div>
-      </div>
+<line x1="98" y1="48" x2="114" y2="78" stroke="#7a3500" stroke-width="1" marker-end="url(#ao)"/>
+<text x="100" y="60" font-size="5" fill="#7a3500">Q_m</text>
 
-      <!-- Table -->
-      <div class="box box-table" style="margin-bottom:12px;">
-        <div class="box-label">Table Cells</div>
-        <div class="box-val" style="font-size:10px; font-family:monospace;">
-          [Revenue, 100K, r=0,c=0]<br>
-          [COGS, 70K, r=1,c=0]<br>
-          [GP, 30K, r=2,c=0]
-        </div>
-      </div>
+<line x1="98" y1="114" x2="114" y2="98" stroke="#7a3500" stroke-width="1" marker-end="url(#ao)"/>
+<text x="100" y="112" font-size="5" fill="#7a3500">D_m</text>
 
-    </div>
+<!-- Table → Structural -->
+<line x1="92" y1="168" x2="132" y2="214" stroke="#1a5c3e" stroke-width="1.1" marker-end="url(#ag)"/>
+<text x="106" y="186" font-size="5.5" font-weight="bold" fill="#1a5040">T</text>
 
-    <!-- Spacer -->
-    <div class="spacer-row"></div>
 
-    <!-- Column 2: Encoders -->
-    <div class="col-text" style="display:flex; flex-direction:column; gap:12px;">
+<!-- ══════════════════════════════════════════════════
+     TEXT SIGNAL  (blue)
+     Math: text → tokenizer → BGE → [CLS] → LayerNorm → L2 → q_text / d_text
+══════════════════════════════════════════════════ -->
 
-      <!-- Text Encoder -->
-      <div class="encoder-box text-encoder">
-        <div class="box-label">C2 — Shared Backbone</div>
-        <div class="encoder-name">Text Encoder</div>
-        <div class="encoder-sub">BGE-Large (335M)</div>
-        <div class="encoder-detail">d<sub>text</sub> = 1024</div>
-      </div>
+<rect x="214" y="6" width="290" height="72" rx="7" fill="#e0e9f7" stroke="#3068b0" stroke-width="1.2"/>
+<text x="232" y="22" font-size="8.5" font-weight="bold" fill="#0d2850">Text Signal</text>
 
-      <!-- Entity Encoder -->
-      <div class="encoder-box entity-encoder">
-        <div class="box-label">C2 — Shared Backbone</div>
-        <div class="encoder-name">Entity Encoder</div>
-        <div class="encoder-sub">Shared BGE + Projection</div>
-        <div class="encoder-detail">e<sub>Q</sub>, e<sub>D</sub> ∈ ℝ²⁵⁶</div>
-      </div>
+<!-- backbone → text lane -->
+<line x1="196" y1="38" x2="224" y2="38" stroke="#1a4a8a" stroke-width="1.2" marker-end="url(#ab)"/>
 
-      <!-- Template + GAT -->
-      <div class="encoder-box gat-encoder">
-        <div class="box-label">C1 — Novel Contribution</div>
-        <div class="encoder-name">Entity-Aware GAT</div>
-        <div class="encoder-sub">2-layer · 4-head · edge-aware</div>
-        <div class="encoder-detail">d<sub>KG</sub> = 256</div>
-      </div>
+<!-- [CLS] -->
+<rect x="226" y="24" width="52" height="36" rx="4" fill="white" stroke="#3068b0" stroke-width=".9"/>
+<text x="252" y="40" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#0d2850">[CLS]</text>
+<text x="252" y="52" text-anchor="middle" font-size="6" fill="#555">pool</text>
 
-    </div>
+<line x1="278" y1="42" x2="296" y2="42" stroke="#3068b0" stroke-width="1" marker-end="url(#ab)"/>
 
-    <!-- Spacer -->
-    <div class="spacer-row"></div>
+<!-- LayerNorm -->
+<rect x="298" y="24" width="50" height="36" rx="4" fill="white" stroke="#3068b0" stroke-width=".9"/>
+<text x="323" y="40" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#0d2850">LN</text>
+<text x="323" y="52" text-anchor="middle" font-size="6" fill="#555">LayerNorm</text>
 
-    <!-- Column 3: Intermediate values -->
-    <div class="col-center" style="display:flex; flex-direction:column; align-items:center; gap:14px; padding:0 8px;">
+<line x1="348" y1="34" x2="370" y2="34" stroke="#3068b0" stroke-width="1" marker-end="url(#ab)"/>
+<line x1="348" y1="50" x2="370" y2="50" stroke="#3068b0" stroke-width="1" marker-end="url(#ab)"/>
 
-      <div style="text-align:center;">
-        <div style="font-size:11px; font-weight:700; color:#1e40af; background:#dbeafe; border-radius:4px; padding:4px 10px; display:inline-block;">
-          d<sub>text</sub> ∈ ℝ¹⁰²⁴
-        </div>
-      </div>
+<!-- q_text, d_text -->
+<rect x="372" y="22" width="56" height="20" rx="4" fill="#1a4a8a"/>
+<text x="400" y="36" text-anchor="middle" font-size="8" font-weight="bold" fill="white">q_text</text>
+<rect x="372" y="46" width="56" height="20" rx="4" fill="#4a7cc0"/>
+<text x="400" y="60" text-anchor="middle" font-size="8" font-weight="bold" fill="white">d_text</text>
 
-      <div style="text-align:center;">
-        <div style="font-size:11px; font-weight:700; color:#6d28d9; background:#ede9fe; border-radius:4px; padding:4px 10px; display:inline-block;">
-          e<sub>Q</sub>, e<sub>D</sub> ∈ ℝ²⁵⁶
-        </div>
-      </div>
+<text x="440" y="36" font-size="5.5" fill="#0d2850">∈ ℝ^d</text>
+<text x="440" y="60" font-size="5.5" fill="#0d2850">∈ ℝ^d</text>
 
-      <div>
-        <div class="template-box" style="margin-bottom:6px;">
-          Template Parsing<br>
-          <span style="font-size:9px; color:#b45309;">15 IFRS/GAAP patterns</span>
-        </div>
-        <div style="font-size:11px; text-align:center; color:#1d4ed8; font-weight:700; background:#dbeafe; border-radius:4px; padding:4px 10px;">
-          Constraint KG<br>
-          <span style="font-size:9px; font-weight:400; color:#3b82f6;">nodes + ω-edges</span>
-        </div>
-      </div>
 
-      <div style="text-align:center;">
-        <div style="font-size:11px; font-weight:700; color:#1e40af; background:#dbeafe; border-radius:4px; padding:4px 10px; display:inline-block;">
-          d<sub>KG</sub> ∈ ℝ²⁵⁶
-        </div>
-      </div>
+<!-- ══════════════════════════════════════════════════
+     ENTITY SIGNAL  (orange)
+     Math: company→BGE→[CLS] ⊕ year→BGE→[CLS] ⊕ sector→BGE→[CLS]
+           → concat → Linear(3d,d) → ReLU → Drop → Linear(d,d_e) → LN → L2 → e_Q / e_D
+══════════════════════════════════════════════════ -->
 
-      <!-- CHAP Sampler -->
-      <div style="text-align:center;">
-        <div style="font-size:11px; font-weight:700; color:#92400e; background:#fef3c7; border:1.5px solid #fde68a; border-radius:6px; padding:6px 10px; margin-bottom:4px;">
-          C3 — CHAP Negative Sampler
-        </div>
-        <div style="font-size:9px; color:#b45309;">A / S / E perturbations</div>
-      </div>
+<rect x="214" y="92" width="290" height="62" rx="7" fill="#faebd0" stroke="#b06820" stroke-width="1.2"/>
+<text x="232" y="108" font-size="8.5" font-weight="bold" fill="#5a2800">Entity Signal</text>
 
-    </div>
+<!-- backbone → entity lane -->
+<line x1="196" y1="98" x2="224" y2="114" stroke="#7a3500" stroke-width="1.2" marker-end="url(#ao)"/>
 
-    <!-- Spacer -->
-    <div class="spacer-row"></div>
+<!-- Three BGE calls -->
+<rect x="226" y="104" width="30" height="26" rx="4" fill="white" stroke="#b06820" stroke-width=".8"/>
+<text x="241" y="116" text-anchor="middle" font-size="6" font-weight="bold" fill="#5a2800">BGE</text>
+<text x="241" y="126" text-anchor="middle" font-size="5" fill="#888">co.</text>
 
-    <!-- Column 4: Joint Scorer -->
-    <div class="col-scorer">
-      <div class="scorer-box" style="margin-top:60px;">
-        <div class="box-label">C1+C2 — Joint Scoring</div>
-        <div class="scorer-name">Joint Scorer</div>
-        <div class="scorer-inputs">
-          <div class="scorer-input-row">
-            <span class="arrow-in">→</span>
-            <span>d<sub>text</sub></span>
-          </div>
-          <div class="scorer-input-row">
-            <span class="arrow-in">→</span>
-            <span>e<sub>D</sub></span>
-          </div>
-          <div class="scorer-input-row">
-            <span class="arrow-in">→</span>
-            <span>d<sub>KG</sub></span>
-          </div>
-        </div>
-        <div style="font-size:10px; color:#6c757d; background:#f0fdf4; border-radius:4px; padding:4px 8px;">
-          + Constraint Score CS(G<sub>D</sub>)
-        </div>
-      </div>
-    </div>
+<rect x="260" y="104" width="24" height="26" rx="4" fill="white" stroke="#b06820" stroke-width=".8"/>
+<text x="272" y="116" text-anchor="middle" font-size="6" font-weight="bold" fill="#5a2800">BGE</text>
+<text x="272" y="126" text-anchor="middle" font-size="5" fill="#888">yr.</text>
 
-    <!-- Column 5: Output -->
-    <div class="col-output">
-      <div class="output-box" style="margin-top:90px;">
-        <div class="box-label" style="color:#15803d; opacity:0.7;">Ranking Score</div>
-        <div class="output-name">s(Q, C)</div>
-        <div class="output-formula">
-          α·d<sub>text</sub> + β·e<sub>D</sub> + γ·CS
-        </div>
-      </div>
-    </div>
+<rect x="288" y="104" width="28" height="26" rx="4" fill="white" stroke="#b06820" stroke-width=".8"/>
+<text x="302" y="116" text-anchor="middle" font-size="6" font-weight="bold" fill="#5a2800">BGE</text>
+<text x="302" y="126" text-anchor="middle" font-size="5" fill="#888">sec.</text>
 
-  </div>
+<!-- ⊕ -->
+<rect x="320" y="104" width="22" height="26" rx="4" fill="white" stroke="#b06820" stroke-width=".8"/>
+<text x="331" y="120" text-anchor="middle" font-size="10" fill="#5a2800">⊕</text>
 
-  <!-- Training Losses -->
-  <div class="loss-section">
-    <div class="loss-section-title">Training Losses (gradient flow — dashed lines)</div>
-    <div class="loss-grid">
-      <div class="loss-box">
-        <div class="loss-name">L<sub>EntitySupCon</sub></div>
-        <div class="loss-desc">Entity clustering<br>C2 back → Shared BGE</div>
-      </div>
-      <div class="loss-box">
-        <div class="loss-name">L<sub>triplet</sub></div>
-        <div class="loss-desc">Rank positive &gt; negative<br>back → Joint Scorer</div>
-      </div>
-      <div class="loss-box">
-        <div class="loss-name">L<sub>constraint</sub></div>
-        <div class="loss-desc">CHAP validity<br>back → GAT + Scorer</div>
-      </div>
-      <div class="loss-box">
-        <div class="loss-name">L<sub>CACLLoss</sub></div>
-        <div class="loss-desc">Combined: triplet<br>+ λ<sub>c</sub>·constraint</div>
-      </div>
-    </div>
+<!-- MLP: concat → Linear(3d,d) → ReLU → Drop → Linear(d,d_e) -->
+<rect x="346" y="100" width="62" height="34" rx="4" fill="white" stroke="#b06820" stroke-width=".9"/>
+<text x="377" y="114" text-anchor="middle" font-size="7" font-weight="bold" fill="#5a2800">Linear</text>
+<text x="377" y="125" text-anchor="middle" font-size="6" fill="#555">→ReLU→Drop</text>
+<text x="377" y="134" text-anchor="middle" font-size="6" fill="#555">→Linear→LN</text>
 
-    <div class="legend">
-      <div class="legend-item">
-        <div class="legend-line forward"></div>
-        <span>Forward pass (inference)</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-line grad"></div>
-        <span>Gradient backpropagation</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-line chat"></div>
-        <span>CHAP negative generation</span>
-      </div>
-      <div class="legend-item" style="margin-left:16px;">
-        <span class="key-dot dot-c1"></span>
-        <span class="key-text">C1: Graph-Structured KG</span>
-      </div>
-      <div class="legend-item">
-        <span class="key-dot dot-c2"></span>
-        <span class="key-text">C2: EntitySupCon Loss</span>
-      </div>
-      <div class="legend-item">
-        <span class="key-dot dot-c3"></span>
-        <span class="key-text">C3: CHAP Hard Negatives</span>
-      </div>
-    </div>
-  </div>
+<!-- LN + L2 -->
+<rect x="412" y="100" width="30" height="34" rx="4" fill="white" stroke="#b06820" stroke-width=".8"/>
+<text x="427" y="114" text-anchor="middle" font-size="7" font-weight="bold" fill="#5a2800">LN</text>
+<text x="427" y="125" text-anchor="middle" font-size="6" fill="#555">L2</text>
+
+<!-- outputs -->
+<line x1="442" y1="110" x2="462" y2="110" stroke="#b06820" stroke-width="1" marker-end="url(#ao)"/>
+<line x1="442" y1="124" x2="462" y2="124" stroke="#b06820" stroke-width="1" marker-end="url(#ao)"/>
+
+<rect x="464" y="100" width="36" height="18" rx="4" fill="#7a3500"/>
+<text x="482" y="113" text-anchor="middle" font-size="7.5" font-weight="bold" fill="white">e_Q</text>
+<rect x="464" y="122" width="36" height="18" rx="4" fill="#b06820"/>
+<text x="482" y="135" text-anchor="middle" font-size="7.5" font-weight="bold" fill="white">e_D</text>
+
+<text x="512" y="113" font-size="5.5" fill="#5a2800">∈ ℝ^{d_e}</text>
+<text x="512" y="135" font-size="5.5" fill="#5a2800">∈ ℝ^{d_e}</text>
+
+<!-- ℒ_ent badge -->
+<rect x="464" y="80" width="24" height="16" rx="7" fill="#fce0dc" stroke="#7a2520" stroke-width=".8"/>
+<text x="476" y="91" text-anchor="middle" font-size="6.5" font-weight="bold" fill="#7a2520">ℒ_e</text>
+
+
+<!-- ══════════════════════════════════════════════════
+     STRUCTURAL SIGNAL  (teal)
+══════════════════════════════════════════════════ -->
+
+<rect x="116" y="168" width="374" height="142" rx="7" fill="#dff0e8" stroke="#267a5e" stroke-width="1.2"/>
+<text x="134" y="186" font-size="8.5" font-weight="bold" fill="#1a5040">Structural Signal</text>
+
+<!-- Template Matching -->
+<rect x="134" y="200" width="70" height="38" rx="5" fill="white" stroke="#267a5e" stroke-width="1"/>
+<text x="169" y="216" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#1a5040">Template</text>
+<text x="169" y="228" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#1a5040">Matching</text>
+<text x="169" y="237" text-anchor="middle" font-size="5.5" fill="#555">IFRS / GAAP</text>
+
+<line x1="204" y1="219" x2="224" y2="219" stroke="#1a5c3e" stroke-width="1" marker-end="url(#ag)"/>
+
+<!-- KG -->
+<rect x="226" y="198" width="62" height="48" rx="5" fill="white" stroke="#267a5e" stroke-width="1"/>
+<text x="257" y="214" text-anchor="middle" font-size="8.5" font-weight="bold" fill="#1a5040">KG</text>
+<circle cx="242" cy="230" r="4.5" fill="#267a5e" opacity=".5"/>
+<circle cx="262" cy="223" r="3.5" fill="#5aab8e" opacity=".5"/>
+<circle cx="262" cy="237" r="3.5" fill="#5aab8e" opacity=".5"/>
+<line x1="246" y1="229" x2="259" y2="224" stroke="#267a5e" stroke-width=".8"/>
+<line x1="246" y1="231" x2="259" y2="236" stroke="#267a5e" stroke-width=".8"/>
+<text x="273" y="226" font-size="5" fill="#1a5040">+1</text>
+<text x="273" y="240" font-size="5" fill="#1a5040">−1</text>
+
+<!-- KG → GAT (upper) -->
+<line x1="288" y1="210" x2="312" y2="210" stroke="#1a5c3e" stroke-width="1" marker-end="url(#ag)"/>
+
+<rect x="314" y="196" width="72" height="34" rx="5" fill="white" stroke="#267a5e" stroke-width="1"/>
+<text x="350" y="210" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#1a5040">Edge-Aware</text>
+<text x="350" y="223" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#1a5040">GAT</text>
+
+<line x1="386" y1="213" x2="412" y2="213" stroke="#1a5c3e" stroke-width="1" marker-end="url(#ag)"/>
+
+<rect x="414" y="203" width="52" height="20" rx="4" fill="#1a5c3e"/>
+<text x="440" y="217" text-anchor="middle" font-size="8" font-weight="bold" fill="white">d_KG</text>
+
+<!-- KG → Constraint Scoring (lower) -->
+<line x1="288" y1="234" x2="312" y2="260" stroke="#1a5c3e" stroke-width="1" marker-end="url(#ag)"/>
+
+<rect x="314" y="246" width="72" height="34" rx="5" fill="white" stroke="#267a5e" stroke-width="1"/>
+<text x="350" y="260" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#1a5040">Constraint</text>
+<text x="350" y="273" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#1a5040">Scoring</text>
+
+<line x1="386" y1="263" x2="412" y2="263" stroke="#1a5c3e" stroke-width="1" marker-end="url(#ag)"/>
+
+<rect x="414" y="253" width="52" height="20" rx="4" fill="#267a5e"/>
+<text x="440" y="267" text-anchor="middle" font-size="8" font-weight="bold" fill="white">CS</text>
+
+<!-- CHAP -->
+<rect x="134" y="256" width="78" height="42" rx="5" fill="#fce0dc" stroke="#7a2520" stroke-width=".9"/>
+<text x="173" y="272" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#7a2520">CHAP</text>
+<text x="173" y="286" text-anchor="middle" font-size="6" fill="#7a2520">hard neg. C⁻</text>
+
+<line x1="249" y1="246" x2="214" y2="264" stroke="#7a2520" stroke-width=".9" stroke-dasharray="3,2" marker-end="url(#ar)"/>
+<text x="240" y="260" font-size="5" fill="#7a2520">perturb ω</text>
+
+
+<!-- ══════════════════════════════════════════════════
+     JOINT SCORER  — correct math from source code
+     s(Q,D) = α·s_text + β·s_entity + γ·s_struct
+     s_text  = cos(q,d) × (0.5+0.5·σ(gate(q))) + 0.2·MLP([d⊕d_KG])
+     s_entity = cos(e_Q, e_D)
+     s_struct = MLP_cs([raw_cs, viol_ratio, edge_norm])
+══════════════════════════════════════════════════ -->
+
+<rect x="530" y="6" width="180" height="298" rx="8" fill="#ede5f7" stroke="#5a3a90" stroke-width="1.5"/>
+<text x="620" y="26" text-anchor="middle" font-size="10.5" font-weight="bold" fill="#2a1060">Joint Scorer</text>
+
+<!-- s_text box -->
+<rect x="544" y="34" width="152" height="62" rx="5" fill="#e0e9f7" stroke="#3068b0" stroke-width="1"/>
+<text x="620" y="50" text-anchor="middle" font-size="8.5" font-weight="bold" fill="#0d2850">s_text</text>
+<text x="620" y="64" text-anchor="middle" font-size="6" fill="#222">cos(q_text, d_text) ×</text>
+<text x="620" y="76" text-anchor="middle" font-size="6" fill="#222">(0.5 + 0.5 · σ(gate(q)))</text>
+<text x="620" y="88" text-anchor="middle" font-size="6" fill="#555">+ 0.2 · MLP([d_text ⊕ d_KG])</text>
+
+<!-- s_entity box -->
+<rect x="544" y="108" width="152" height="38" rx="5" fill="#faebd0" stroke="#b06820" stroke-width="1"/>
+<text x="620" y="124" text-anchor="middle" font-size="8.5" font-weight="bold" fill="#5a2800">s_entity</text>
+<text x="620" y="138" text-anchor="middle" font-size="6" fill="#222">cos(e_Q, e_D)</text>
+
+<!-- s_struct box -->
+<rect x="544" y="158" width="152" height="38" rx="5" fill="#dff0e8" stroke="#267a5e" stroke-width="1"/>
+<text x="620" y="174" text-anchor="middle" font-size="8.5" font-weight="bold" fill="#1a5040">s_struct</text>
+<text x="620" y="188" text-anchor="middle" font-size="6" fill="#222">MLP([raw_cs, viol_ratio, edge_norm])</text>
+
+<!-- Weighted sum: α·s_text + β·s_entity + γ·s_struct -->
+<rect x="554" y="208" width="132" height="28" rx="5" fill="white" stroke="#5a3a90" stroke-width="1.1"/>
+<text x="620" y="228" text-anchor="middle" font-size="9.5" font-weight="bold" fill="#4a2880">Σ</text>
+<text x="610" y="222" font-size="6" fill="#4a2880">α·</text>
+<text x="634" y="222" font-size="6" fill="#4a2880">+ β· + γ·</text>
+
+<!-- arrows down to sum -->
+<line x1="590" y1="96" x2="590" y2="208" stroke="#5a3a90" stroke-width=".6" stroke-dasharray="2,2"/>
+<line x1="620" y1="146" x2="620" y2="208" stroke="#5a3a90" stroke-width=".6" stroke-dasharray="2,2"/>
+<line x1="650" y1="196" x2="650" y2="208" stroke="#5a3a90" stroke-width=".6" stroke-dasharray="2,2"/>
+
+<!-- sum → score -->
+<line x1="620" y1="236" x2="620" y2="248" stroke="#5a3a90" stroke-width="1.2" marker-end="url(#av)"/>
+
+<!-- final s(Q,D) -->
+<rect x="556" y="248" width="128" height="24" rx="6" fill="#5a3a90"/>
+<text x="620" y="265" text-anchor="middle" font-size="9.5" font-weight="bold" fill="white">s(Q, D)</text>
+
+<!-- α,β,γ note -->
+<text x="534" y="286" font-size="5.5" fill="#4a2880">α,β,γ = softplus(θ)</text>
+
+
+<!-- ══════════════════════════════════════════════════
+     ARROWS: outputs → scorer
+     q_text/d_text → scorer left, q_text fed to gate too
+     e_Q/e_D → scorer
+     d_KG → scorer
+     CS → scorer
+══════════════════════════════════════════════════ -->
+
+<!-- q_text → s_text box -->
+<line x1="428" y1="32" x2="542" y2="46" stroke="#1a4a8a" stroke-width="1.1" marker-end="url(#ab)"/>
+<text x="485" y="30" font-size="6" font-weight="bold" fill="#0d2850">q_text</text>
+
+<!-- d_text → s_text box -->
+<line x1="428" y1="56" x2="542" y2="70" stroke="#4a7cc0" stroke-width="1.1" marker-end="url(#ab)"/>
+<text x="485" y="55" font-size="6" font-weight="bold" fill="#0d2850">d_text</text>
+
+<!-- e_Q → s_entity box -->
+<line x1="500" y1="109" x2="542" y2="118" stroke="#7a3500" stroke-width="1.1" marker-end="url(#ao)"/>
+<text x="521" y="105" font-size="6" font-weight="bold" fill="#5a2800">e_Q</text>
+
+<!-- e_D → s_entity box -->
+<line x1="500" y1="131" x2="542" y2="138" stroke="#b06820" stroke-width="1.1" marker-end="url(#ao)"/>
+<text x="521" y="133" font-size="6" font-weight="bold" fill="#5a2800">e_D</text>
+
+<!-- d_KG → s_text box -->
+<line x1="466" y1="213" x2="542" y2="82" stroke="#1a5c3e" stroke-width="1.1" marker-end="url(#ag)"/>
+<text x="500" y="150" font-size="6" font-weight="bold" fill="#1a5040" transform="rotate(-50 500 150)">d_KG</text>
+
+<!-- CS → s_struct box -->
+<line x1="466" y1="263" x2="542" y2="177" stroke="#1a5c3e" stroke-width="1.1" marker-end="url(#ag)"/>
+<text x="500" y="226" font-size="6" font-weight="bold" fill="#1a5040" transform="rotate(-45 500 226)">CS</text>
+
+
+<!-- ══════════════════════════════════════════════════
+     OUTPUT
+══════════════════════════════════════════════════ -->
+<line x1="710" y1="152" x2="744" y2="152" stroke="#888" stroke-width="1.5" marker-end="url(#a)"/>
+
+<rect x="748" y="118" width="120" height="68" rx="8" fill="#f0f0f0" stroke="#888" stroke-width="1.2"/>
+<text x="808" y="142" text-anchor="middle" font-size="10" font-weight="bold" fill="#222">Ranked</text>
+<text x="808" y="158" text-anchor="middle" font-size="10" font-weight="bold" fill="#222">Documents</text>
+<text x="808" y="174" text-anchor="middle" font-size="7" fill="#444" font-style="italic">Top-K → LLM</text>
+
+
+<!-- ══════════════════════════════════════════════════
+     TRAINING  (bottom)
+══════════════════════════════════════════════════ -->
+
+<line x1="173" y1="298" x2="173" y2="368" stroke="#7a2520" stroke-width=".9" stroke-dasharray="3,2"/>
+<line x1="173" y1="368" x2="528" y2="368" stroke="#7a2520" stroke-width=".9" stroke-dasharray="3,2" marker-end="url(#ar)"/>
+<text x="350" y="364" font-size="6" fill="#7a2520">C⁻ hard negatives → ℒ_triplet</text>
+
+<rect x="530" y="334" width="180" height="68" rx="6" fill="#fce0dc" stroke="#7a2520" stroke-width="1" stroke-dasharray="5,3"/>
+<text x="548" y="352" font-size="8.5" font-weight="bold" fill="#7a2520">Training (3-stage)</text>
+<text x="548" y="368" font-size="7.5" fill="#222">ℒ = ℒ_triplet</text>
+<text x="548" y="382" font-size="7.5" fill="#222">   + λ_e · ℒ_ent</text>
+<text x="548" y="396" font-size="7.5" fill="#222">   + λ_c · ℒ_con</text>
+
+<line x1="620" y1="334" x2="620" y2="290" stroke="#7a2520" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#ar)"/>
+
+
+<!-- LEGEND -->
+<g transform="translate(4,430)">
+  <line x1="0" y1="0" x2="16" y2="0" stroke="#888" stroke-width="1.3"/>
+  <text x="20" y="3.5" font-size="6.5" fill="#333">forward</text>
+  <line x1="64" y1="0" x2="80" y2="0" stroke="#7a2520" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="84" y="3.5" font-size="6.5" fill="#333">train only</text>
+  <rect x="130" y="-4.5" width="10" height="10" rx="2" fill="#e0e9f7" stroke="#3068b0" stroke-width=".6"/>
+  <text x="144" y="3.5" font-size="6.5" fill="#333">text</text>
+  <rect x="166" y="-4.5" width="10" height="10" rx="2" fill="#faebd0" stroke="#b06820" stroke-width=".6"/>
+  <text x="180" y="3.5" font-size="6.5" fill="#333">entity</text>
+  <rect x="210" y="-4.5" width="10" height="10" rx="2" fill="#dff0e8" stroke="#267a5e" stroke-width=".6"/>
+  <text x="224" y="3.5" font-size="6.5" fill="#333">structure</text>
+  <rect x="266" y="-4.5" width="10" height="10" rx="2" fill="#ede5f7" stroke="#5a3a90" stroke-width=".6"/>
+  <text x="280" y="3.5" font-size="6.5" fill="#333">scorer</text>
+  <rect x="314" y="-4.5" width="10" height="10" rx="2" fill="white" stroke="#444" stroke-width=".8"/>
+  <text x="328" y="3.5" font-size="6.5" fill="#333">backbone</text>
+</g>
+
+</svg>
+
+<!-- CAPTION -->
+<p class="caption">
+<b>Figure 1.</b> Architecture of the GSR-CACL retrieval framework.
+A query <i>Q</i> (text + entity metadata) and document <i>D</i>
+(text + entity metadata + table <i>T</i>) are encoded by a shared
+<b>Backbone</b> <i>f</i><sub>θ</sub> (BGE / E5 / LLM2Vec, LoRA-adapted).
+<b>Text Signal</b> (blue): raw text passes through the backbone and is
+[CLS]-pooled, LayerNorm'd, and L2-normalized to
+<b>q</b><sub>text</sub>, <b>d</b><sub>text</sub> ∈ ℝ<sup>d</sup>.
+<b>Entity Signal</b> (orange): company, year, and sector fields are each
+encoded by the shared backbone (three independent [CLS] passes), concatenated,
+and projected by Linear→ReLU→Dropout→Linear→LayerNorm→L2 to
+<b>e</b><sub>Q</sub>, <b>e</b><sub>D</sub> ∈ ℝ<sup>d</sup><sub>e</sub>;
+ℒ<sub>ent</sub> (SupCon) aligns co-referent mentions, enabling gradient
+flow into the shared backbone.
+<b>Structural Signal</b> (teal): table <i>T</i> (from <i>D</i>) is matched
+against IFRS/GAAP templates to build a signed-edge KG (ω ∈ {+1, −1});
+an edge-aware GAT yields <b>d</b><sub>KG</sub> and constraint scoring yields CS.
+CHAP generates hard negatives C⁻ by perturbing one identity.
+The <b>Joint Scorer</b> (purple) computes:
+<b>s</b><sub>text</sub> = cos(<b>q</b>, <b>d</b>) × (0.5 + 0.5·σ(gate(<b>q</b>)))
+  + 0.2 · MLP([<b>d</b><sub>text</sub> ⊕ <b>d</b><sub>KG</sub>]);
+<b>s</b><sub>entity</sub> = cos(<b>e</b><sub>Q</sub>, <b>e</b><sub>D</sub>);
+<b>s</b><sub>struct</sub> = MLP([raw_cs, violated_ratio, edge_norm]).
+The final score is
+<i>s</i>(<i>Q</i>, <i>D</i>) = α·s<sub>text</sub> + β·s<sub>entity</sub> + γ·s<sub>struct</sub>,
+with α, β, γ ≥ 0 constrained via softplus.
+</p>
 
 </div>
-
-<figcaption>
-  Fig. 1: GSR-CACL overall architecture. Solid arrows denote forward dataflow; dashed arrows denote training gradient backpropagation.
-  Components shaded in <span style="color:var(--contrib1);">blue</span> (C1), <span style="color:var(--contrib2);">purple</span> (C2), and <span style="color:var(--contrib3);">green</span> (C3) are novel contributions.
-  BGE-Large is used as a shared backbone for both Text and Entity encoders (C2), enabling gradient flow from entity loss to text representations.
-</figcaption>
-</figure>
-
-<script>
-// Draw SVG arrows after layout is computed
-function drawArrows() {
-  const svg = document.getElementById('arrowsSvg');
-  const container = document.getElementById('arch');
-  const grid = document.getElementById('mainGrid');
-
-  if (!svg || !grid) return;
-
-  // Get positions of key elements relative to the container
-  const rect = container.getBoundingClientRect();
-  const gridRect = grid.getBoundingClientRect();
-
-  // Helper to get element center relative to SVG
-  function getCenter(el) {
-    const r = el.getBoundingClientRect();
-    return {
-      x: r.left + r.width / 2 - rect.left,
-      y: r.top + r.height / 2 - rect.top
-    };
-  }
-
-  // We'll add arrows manually using known positions based on CSS grid
-  // This is a simplified approach: use percentage-based positioning
-
-  const W = container.offsetWidth;
-  const H = container.offsetHeight;
-
-  const svgNS = "http://www.w3.org/2000/svg";
-
-  // Clear existing
-  svg.innerHTML = document.getElementById('arrowsSvg').innerHTML;
-
-  function addArrow(x1, y1, x2, y2, color, dashed, label, markerEnd) {
-    const line = document.createElementNS(svgNS, "line");
-    line.setAttribute("x1", x1);
-    line.setAttribute("y1", y1);
-    line.setAttribute("x2", x2);
-    line.setAttribute("y2", y2);
-    line.setAttribute("stroke", color);
-    line.setAttribute("stroke-width", "1.5");
-    if (dashed) {
-      line.setAttribute("stroke-dasharray", "4,3");
-      line.setAttribute("opacity", "0.7");
-    }
-    if (markerEnd) line.setAttribute("marker-end", `url(#arr-${markerEnd})`);
-    svg.appendChild(line);
-
-    if (label) {
-      const txt = document.createElementNS(svgNS, "text");
-      txt.setAttribute("x", (x1 + x2) / 2);
-      txt.setAttribute("y", (y1 + y2) / 2 - 4);
-      txt.setAttribute("class", "arrow-label arrow-label-math");
-      txt.setAttribute("fill", color);
-      txt.setAttribute("opacity", "0.8");
-      txt.textContent = label;
-      svg.appendChild(txt);
-    }
-  }
-
-  // Grid layout approximate positions (based on CSS grid with 5 cols)
-  const col1 = W * 0.085;  // inputs
-  const col2 = W * 0.245;  // encoders
-  const col3 = W * 0.49;   // center
-  const col4 = W * 0.745;  // scorer
-  const col5 = W * 0.915;  // output
-
-  // Row positions (approximate)
-  // Doc row ~0.16 of H, Query ~0.28, Meta ~0.40, Table ~0.52, KG ~0.64, CHAP ~0.76
-  const rowDoc   = H * 0.15;
-  const rowQuery = H * 0.27;
-  const rowMeta  = H * 0.39;
-  const rowTable = H * 0.50;
-  const rowKG    = H * 0.60;
-  const rowCHAP  = H * 0.72;
-  const rowEncT  = H * 0.17;  // text encoder
-  const rowEncE  = H * 0.40;  // entity encoder
-  const rowEncG  = H * 0.57;  // GAT
-  const rowScorer = H * 0.48;
-  const rowOutput = H * 0.48;
-
-  // ── Forward arrows ──────────────────────────────────────────
-
-  // Doc text → Text Encoder
-  addArrow(col1 + 75, rowDoc, col2 - 5, rowEncT, "#3b82f6", false, "d_text");
-
-  // Query → Text Encoder (same encoder)
-  addArrow(col1 + 75, rowQuery, col2 - 5, rowEncT + 20, "#3b82f6", false, "Q");
-
-  // Text Encoder → center value
-  addArrow(col2 + 95, rowEncT + 15, col3 - 5, rowDoc + 10, "#3b82f6", false, "d_text");
-
-  // Metadata → Entity Encoder
-  addArrow(col1 + 75, rowMeta, col2 - 5, rowEncE + 10, "#8b5cf6", false, "meta");
-
-  // Entity Encoder → center
-  addArrow(col2 + 95, rowEncE + 15, col3 - 5, rowMeta + 10, "#8b5cf6", false, "e_D");
-
-  // Table cells → Template Parsing (center)
-  addArrow(col1 + 75, rowTable, col3 - 5, rowTable - 5, "#f59e0b", false, null);
-
-  // Template Parsing → GAT Encoder
-  addArrow(col3 + 5, rowKG - 5, col2 + 95, rowEncG + 15, "#f59e0b", false, "KG");
-
-  // GAT Encoder → d_KG (center)
-  addArrow(col2 + 95, rowEncG + 15, col3 - 5, rowKG + 10, "#3b82f6", false, "d_KG");
-
-  // d_KG → Joint Scorer
-  addArrow(col3 + 5, rowKG + 10, col4 - 5, rowScorer + 30, "#3b82f6", false, null);
-
-  // e_D → Joint Scorer
-  addArrow(col3 + 5, rowMeta + 10, col4 - 5, rowScorer + 10, "#8b5cf6", false, null);
-
-  // d_text → Joint Scorer
-  addArrow(col3 + 5, rowDoc + 10, col4 - 5, rowScorer - 10, "#3b82f6", false, null);
-
-  // Joint Scorer → Output
-  addArrow(col4 + 95, rowScorer + 15, col5 - 5, rowOutput, "#10b981", false, "s");
-
-  // Constraint KG → CHAP
-  addArrow(col3, rowKG + 10, col3, rowCHAP, "#f59e0b", false, null);
-
-  // CHAP → Joint Scorer
-  addArrow(col3 + 5, rowCHAP, col4 - 5, rowScorer + 50, "#f59e0b", false, "C-");
-
-  // ── Gradient arrows (dashed) ───────────────────────────────
-
-  // L_EntitySupCon → Entity Encoder (upward dashed)
-  addArrow(col2 + 60, rowEncE + 25, col2 + 60, rowEncE - 5, "#ef4444", true, "∂L_c2");
-
-  // Shared backbone gradient line (vertical purple-blue)
-  const gradientLine = document.createElementNS(svgNS, "line");
-  gradientLine.setAttribute("x1", col2 - 15);
-  gradientLine.setAttribute("y1", rowEncE + 10);
-  gradientLine.setAttribute("x2", col2 - 15);
-  gradientLine.setAttribute("y2", rowEncT + 40);
-  gradientLine.setAttribute("stroke", "#ef4444");
-  gradientLine.setAttribute("stroke-width", "1.5");
-  gradientLine.setAttribute("stroke-dasharray", "4,3");
-  gradientLine.setAttribute("opacity", "0.5");
-  svg.appendChild(gradientLine);
-
-  // L_triplet → Joint Scorer
-  addArrow(col4 + 40, rowScorer + 65, col4 + 40, rowScorer + 30, "#ef4444", true, "∂L_triplet");
-
-  // L_constraint → CHAP → Joint Scorer
-  addArrow(col4 + 40, rowScorer + 65, col3 + 20, rowCHAP, "#ef4444", true, "∂L_constraint");
-
-  // L_constraint → GAT
-  addArrow(col2 + 80, rowEncG + 35, col2 + 80, rowEncG + 15, "#ef4444", true, "∂L_cs");
-
-}
-
-window.addEventListener("load", drawArrows);
-window.addEventListener("resize", drawArrows);
-</script>
-
 </body>
 </html>
