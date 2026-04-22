@@ -1,6 +1,94 @@
 # GSR-CACL
 
-**Graph-Structured Retrieval with Constraint-Aware Contrastive Learning** for financial documents (text + tables).
+Graph-Structured Retrieval with Constraint-Aware Contrastive Learning — retrieval for mixed text+table financial reports.
+
+## Quick summary
+- Purpose: retrieve the correct financial document given a question by combining dense text retrieval (BGE) with a table-structured KG and a GAT-based reranker.
+- Core signals: `s_text` (BGE), `s_entity` (entity embeddings), `CS(G_D)` (constraint score of table KG).
+
+## Install (minimal)
+From `source/`:
+
+```bash
+pip install -e ".[dev]"
+pip install peft accelerate transformers faiss-cpu
+```
+
+Verify:
+
+```bash
+python -c "from gsr_cacl import GATEncoder, JointScorer; print('OK')"
+```
+
+## Hardware presets (recommended)
+- `t4` — `bge-large`, **LoRA r=16**, batch 8 — fits a T4 / 16GB GPU (quick experiments).
+- `a100` — `bge-large`, **full finetune**, batch 16 — for final Stage‑3 full finetune.
+- `v100` — `bge-base`, **full finetune**, batch 16 — midrange option.
+- `cpu` — debug only (frozen encoder).
+
+## Minimal training commands
+- Full three-stage pipeline (LoRA, T4):
+
+```bash
+python -m gsr_cacl.train --dataset tatqa --stage all --preset t4 --gradient-checkpointing
+```
+
+- Run only Stage 3 (full finetune, A100 recommended):
+
+```bash
+python -m gsr_cacl.train --dataset tatqa --stage joint --preset a100 --finetune full --epochs 7
+```
+
+## Three-stage curriculum (short)
+- Stage 1 — Identity: Triplet + EntitySupCon (learn entity/text signals).
+- Stage 2 — Structural: train `GATEncoder` to calibrate constraint score (MSE target ≈ 1.0).
+- Stage 3 — Joint (CACL): Triplet + EntitySupCon + Constraint loss with CHAP hard negatives.
+
+## Prioritized recipes to improve R@3 / MRR (what to try, in order)
+1. Increase hard negatives: raise number of CHAP negatives per sample (more CHAP‑A/S). Hard negatives directly improve top‑k ranking.
+2. Swap loss to InfoNCE / in‑batch softmax or add listwise loss — optimizes rank/MRR more directly than margin triplet.
+3. If limited GPU (T4): increase LoRA capacity: `--lora-r 32 --lora-alpha 64` and extend Stage‑3 epochs (7+).
+4. If A100 available: run Stage‑3 full finetune (low LR ~2e‑6, epochs 6–8) — best single improvement for ranking.
+5. Add a lightweight cross‑encoder reranker on top‑K (top‑50 → rerank) if inference latency allows — fastest MRR gains.
+6. Tune scorer weights / temperatures: grid search α/β/γ or validate `JointScorer` learned scalars on dev set.
+
+Example LoRA sweep (cheap):
+
+```bash
+python -m gsr_cacl.train --dataset tatqa --stage all --preset t4 --epochs 7 --lora-r 32 --lora-alpha 64 \
+    --lambda-entity 0.8 --lambda-constraint 0.8 --margin 0.15 --contr1 v2 --contr2 v2
+```
+
+Example Stage‑3 full finetune (heavy):
+
+```bash
+python -m gsr_cacl.train --dataset tatqa --stage joint --preset a100 --finetune full \
+    --epochs 7 --lr 2e-6 --lambda-entity 0.8 --lambda-constraint 0.8 --contr1 v2 --contr2 v2
+```
+
+## Benchmarking
+- Quick sample test:
+
+```bash
+python -m gsr_cacl.benchmark_gsr --mode gsr --dataset tatqa --sample 50 --contr1 v2 --contr2 v2
+```
+
+## Notes & pointers
+- CHAP negatives live in `negative_sampler/chap.py` — primary lever for top‑k quality.
+- `encoders/` contains `text_encoder.py`, `entity_encoder.py`, `gat_encoder.py` and `gat_layer.py` — `GATLayer` and `GATEncoder` are trained in Stage‑2/3.
+- Constraint scoring: `scoring/constraint_score.py` supports `v1` (fixed ε) and `v2` (relative tolerance) — prefer `v2` for numerical robustness.
+
+## Quick code map
+- Training entry: `src/gsr_cacl/train.py`
+- Benchmark: `src/gsr_cacl/benchmark_gsr.py`
+- KG builder: `src/gsr_cacl/kg/builder.py`
+- Negative sampler: `src/gsr_cacl/negative_sampler/chap.py`
+- Joint scorer: `src/gsr_cacl/scoring/joint_scorer.py`
+
+---
+Small, focused README — run the two recipe commands above to test improvements. If you want, I can now:
+- prepare a short experiment plan (LoRA sweep + reranker) with exact hyperparameters, or
+- open and patch `gat_layer.py` to add a numerically‑stable softmax change.
 
 > **Paper:** *Structured Knowledge-Enhanced Retrieval for Financial Documents* — T²-RAGBench (EACL 2026)
 > **Benchmark:** [G4KMU/t2-ragbench](https://huggingface.co/datasets/G4KMU/t2-ragbench) (23,088 QA pairs, 7,318 documents)

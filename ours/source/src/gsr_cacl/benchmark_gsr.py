@@ -111,6 +111,7 @@ def run_gsr_benchmark(
     device: str | None = None,
     output_dir: Path | None = None,
     sample_size: int | None = None,
+    checkpoint_path: str | None = None,
 ) -> dict:
     """
     Run GSR retrieval benchmark on a T²-RAGBench subset.
@@ -168,6 +169,7 @@ def run_gsr_benchmark(
         embedding_function=embeddings,
         top_k=top_k,
         device=device,
+        checkpoint_path=checkpoint_path,
         alpha=gsr_params.get("alpha", 0.5),
         beta=gsr_params.get("beta", 0.3),
         gamma=gsr_params.get("gamma", 0.2),
@@ -254,6 +256,7 @@ def _main_hydra() -> None:
         embedding_model = gsr_params.pop("embedding_model", None) or \
             cfg.get("model", {}).get("embedding", {}).get("name", "intfloat/multilingual-e5-large-instruct")
 
+        checkpoint_path = gsr_params.pop("checkpoint", None)
         run_gsr_benchmark(
             mode=cfg.mode,
             config_name=ds.config_name,
@@ -263,6 +266,7 @@ def _main_hydra() -> None:
             top_k=gsr_params.pop("top_k", cfg.get("eval", {}).get("top_k", 3)),
             device=None,
             sample_size=cfg.get("eval", {}).get("sample_size"),
+            checkpoint_path=checkpoint_path,
         )
 
     _run()
@@ -285,6 +289,8 @@ def _main_argparse() -> None:
     parser.add_argument("--output-dir", type=str, default=None)
     parser.add_argument("--sample", type=int, default=None,
                         help="Limit number of QA samples (for debugging)")
+    parser.add_argument("--checkpoint", type=str, default=None,
+                        help="Path to trained checkpoint (.pt file) for entity embeddings and scorer weights")
     parser.add_argument(
         "--contr1", type=str, default="v1", choices=["v1", "v2"],
         help="Numeric encoding version: v1=log-scale [4 features], v2=ScaleAwareNumericEncoder "
@@ -323,6 +329,7 @@ def _main_argparse() -> None:
             output_dir=output_dir,
             sample_size=args.sample,
             gsr_params=gsr_params,
+            checkpoint_path=args.checkpoint,
         )
     except Exception as e:
         logger.error(f"Benchmark failed: {e}", exc_info=True)

@@ -10,6 +10,7 @@ No dependency on g4k — uses gsr_cacl.core.Document directly.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import logging
@@ -22,6 +23,7 @@ from gsr_cacl.core import Document
 from gsr_cacl.kg.builder import build_kg_from_markdown
 from gsr_cacl.kg.data_structures import ConstraintKG
 from gsr_cacl.encoders.gat_encoder import GATEncoder
+from gsr_cacl.encoders.entity_encoder import SharedEncoder
 from gsr_cacl.scoring.constraint_score import compute_constraint_score, ConstraintScoringVersion
 from gsr_cacl.encoders.numeric_encoder import build_numeric_encoder
 from gsr_cacl.scoring.joint_scorer import JointScorer
@@ -74,11 +76,31 @@ class GSRRetrieval:
             device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = torch.device(device)
 
+        self.checkpoint_path = checkpoint_path
+        self.gat_hidden_dim = gat_hidden_dim
+
+        # Load checkpoint metadata first (to configure dimensions)
+        if checkpoint_path is not None:
+            ckpt = torch.load(checkpoint_path, map_location=self.device, weights_only=True)
+            self._ckpt_embed_dim = ckpt.get("embed_dim", None)
+            self._ckpt_entity_dim = ckpt.get("entity_dim", 256)
+            logger.info(
+                f"Checkpoint: model={ckpt.get('encoder_model_name','?')}, "
+                f"embed_dim={self._ckpt_embed_dim}, entity_dim={self._ckpt_entity_dim}"
+            )
+        else:
+            self._ckpt_embed_dim = None
+            self._ckpt_entity_dim = 256
+
         # Step 1: FAISS text index
         self._build_faiss_index()
 
-        # Infer embedding dimension from the first document
-        self._embed_dim = len(self.doc_text_embeds[0]) if len(self.doc_text_embeds) > 0 else 768
+        # Infer embedding dimension — prefer checkpoint dim; fall back to corpus embedding
+        self._embed_dim = (
+            self._ckpt_embed_dim
+            if self._ckpt_embed_dim is not None
+            else (len(self.doc_text_embeds[0]) if len(self.doc_text_embeds) > 0 else 768)
+        )
 
         # Step 2: Constraint KGs for all docs
         self._build_all_kgs()
@@ -96,13 +118,20 @@ class GSRRetrieval:
         logger.info(f"Numeric encoder: contr1={self.contr1}, "
                     f"module={'ScaleAware' if numeric_mod is not None else 'log-scale'}")
 
-        # Joint scorer (§4.4)
+        # SharedEncoder for entity embeddings — loaded from checkpoint if available
+        self.use_entity_embeddings = checkpoint_path is not None
+        self.shared_encoder: SharedEncoder | None = None
+        if self.use_entity_embeddings:
+            self.shared_encoder = self._build_shared_encoder(checkpoint_path)
+
+        # Joint scorer (§4.4) — use entity_embed_dim from checkpoint
         self.scorer = JointScorer(
             text_embed_dim=self._embed_dim,
             kg_embed_dim=gat_hidden_dim,
+            entity_embed_dim=self._ckpt_entity_dim,
         ).to(self.device)
 
-        # Load pre-trained weights if available
+        # Load pre-trained weights
         if checkpoint_path is not None:
             self._load_checkpoint(checkpoint_path)
 
@@ -112,14 +141,77 @@ class GSRRetrieval:
         # Pre-encode KGs
         self._encode_all_kgs()
 
+        # Pre-encode all document entity embeddings (index time)
+        if self.use_entity_embeddings and self.shared_encoder is not None:
+            self._encode_all_entity_embeddings()
+        else:
+            self.doc_entity_embeds: list | None = None
+
+    def _build_shared_encoder(self, checkpoint_path: str) -> SharedEncoder:
+        """Build SharedEncoder from checkpoint config, WITHOUT loading weights yet."""
+        ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
+        model_name = ckpt.get(
+            "encoder_model_name", "BAAI/bge-large-en-v1.5"
+        )
+        finetune = ckpt.get("finetune_strategy", "lora")
+        entity_dim = ckpt.get("entity_dim", 256)
+
+        encoder = SharedEncoder(
+            model_name=model_name,
+            finetune=finetune,
+            entity_dim=entity_dim,
+        )
+        return encoder
+
+    def _encode_all_entity_embeddings(self) -> None:
+        """Encode entity metadata for all corpus documents at index time."""
+        if self.shared_encoder is None:
+            return
+
+        companies, years, sectors = [], [], []
+        for doc in tqdm(self.corpus, desc="Encoding document entity embeddings"):
+            meta = doc.meta_data if isinstance(doc.meta_data, dict) else {}
+            companies.append(str(meta.get("company_name", "")))
+            years.append(str(meta.get("report_year", "")))
+            sectors.append(str(meta.get("company_sector", "")))
+
+        self.shared_encoder.eval()
+        with torch.no_grad():
+            self.doc_entity_embeds = self.shared_encoder.entity_encode(
+                companies, years, sectors
+            )
+        logger.info(f"Pre-encoded {len(self.doc_entity_embeds)} document entity embeddings")
+
+    def _encode_query_entity(
+        self, query_meta: dict[str, Any] | None
+    ) -> torch.Tensor | None:
+        """Encode query entity metadata at query time. Returns None if no encoder."""
+        if self.shared_encoder is None or query_meta is None:
+            return None
+
+        meta = query_meta if isinstance(query_meta, dict) else {}
+        company = str(meta.get("company_name", ""))
+        year = str(meta.get("report_year", ""))
+        sector = str(meta.get("company_sector", ""))
+
+        with torch.no_grad():
+            emb = self.shared_encoder.entity_encode([company], [year], [sector])
+        return emb.squeeze(0)  # [entity_dim]
+
     def _load_checkpoint(self, path: str) -> None:
-        """Load pre-trained scorer and GAT encoder weights."""
+        """Load pre-trained SharedEncoder, scorer, and GAT encoder weights."""
         import logging
         logger = logging.getLogger(__name__)
         ckpt = torch.load(path, map_location=self.device, weights_only=True)
+
+        if "encoder_state" in ckpt and self.shared_encoder is not None:
+            self.shared_encoder.load_state_dict(ckpt["encoder_state"])
+            logger.info(f"Loaded SharedEncoder weights from {path}")
+
         if "scorer_state" in ckpt:
             self.scorer.load_state_dict(ckpt["scorer_state"])
             logger.info(f"Loaded scorer weights from {path}")
+
         if "gat_encoder_state" in ckpt:
             self.gat_encoder.load_state_dict(ckpt["gat_encoder_state"])
             logger.info(f"Loaded GAT encoder weights from {path}")
@@ -186,12 +278,17 @@ class GSRRetrieval:
 
         Joint Score = α·sim_text(Q,D,KG) + β·sim_entity(Q,D) + γ·CS(G_D)
         Uses JointScorer with KG embeddings from GAT encoder.
+        When checkpoint with entity encoder is available: uses learned entity embeddings
+        (cosine similarity from SharedEncoder) instead of exact string match.
         """
         # FAISS first-stage retrieval → candidate LangChain Documents
         candidates = self.vector_store.similarity_search(query, k=self.top_k * 4)
 
         q_text_emb = np.array(self.embedding_function.embed_query(query))
         q_tensor = torch.tensor(q_text_emb, dtype=torch.float32, device=self.device)
+
+        # Encode query entity metadata once (if entity encoder is available)
+        q_entity_emb = self._encode_query_entity(query_meta)
 
         scores: list[tuple[int, float]] = []
         for cand in candidates:
@@ -214,18 +311,29 @@ class GSRRetrieval:
                 version=self.contr_version, relative_tolerance=self.rel_tol,
             )
 
-            # Entity matching score
-            entity_score = self._compute_entity_score(query_meta, corpus_idx)
-
-            # Use JointScorer for final score (integrates text + KG + entity + constraint)
-            with torch.no_grad():
-                final_score = self.scorer.score_single(
-                    query_text_embed=q_tensor,
-                    doc_text_embed=doc_tensor,
-                    kg_embed=kg_embed,
-                    entity_score=entity_score,
-                    constraint_result=cs_result,
-                )
+            # Use learned entity embeddings when available, fall back to exact match
+            if q_entity_emb is not None and self.doc_entity_embeds is not None:
+                doc_entity_emb = self.doc_entity_embeds[corpus_idx].to(self.device)
+                with torch.no_grad():
+                    final_score = self.scorer.score_single_learned(
+                        query_text_embed=q_tensor,
+                        doc_text_embed=doc_tensor,
+                        kg_embed=kg_embed,
+                        query_entity_embed=q_entity_emb,
+                        doc_entity_embed=doc_entity_emb,
+                        constraint_result=cs_result,
+                    )
+            else:
+                # Fallback: exact entity match (backwards-compatible)
+                entity_score = self._compute_entity_score(query_meta, corpus_idx)
+                with torch.no_grad():
+                    final_score = self.scorer.score_single(
+                        query_text_embed=q_tensor,
+                        doc_text_embed=doc_tensor,
+                        kg_embed=kg_embed,
+                        entity_score=entity_score,
+                        constraint_result=cs_result,
+                    )
 
             scores.append((corpus_idx, final_score))
 

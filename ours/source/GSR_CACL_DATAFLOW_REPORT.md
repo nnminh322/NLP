@@ -77,18 +77,6 @@ sample = RetrievalSample(
 Hai inputs chính:
 - **Query Q**: text + (company, year, sector) metadata — dùng **original name** ("AAPL")
 - **Document D**: text + (company, year, sector) metadata + Table T — dùng **canonical name** ("Apple Inc.")
-
----
-
-## 2. SHARED BACKBONE f_θ
-
-**File**: `ours/source/src/gsr_cacl/encoders/entity_encoder.py` → class `SharedEncoder`
-
-```python
-class SharedEncoder(nn.Module):
-    self.backbone = AutoModel.from_pretrained(model_name)  # BGE / E5 / LLM2Vec
-    self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-    self.embed_dim = backbone.config.hidden_size  # e.g., 1024 (bge-large)
     
     # LoRA applied here if finetune="lora"
     # The SAME self.backbone is used for BOTH text AND entity encoding
