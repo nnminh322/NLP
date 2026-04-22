@@ -257,6 +257,12 @@ class GATEncoder(nn.Module):
         V = len(kg.nodes)
         device = next(self.parameters()).device
 
+        if entity_embeddings is not None:
+            if entity_embeddings.dim() == 1:
+                entity_embeddings = entity_embeddings.unsqueeze(0)
+            if entity_embeddings.size(0) == 1 and V > 1:
+                entity_embeddings = entity_embeddings.expand(V, -1)
+
         # Build cell embeddings (Eq.4)
         cell_embeds = self._build_cell_embeddings(kg, device, external_cell_embeds)
 

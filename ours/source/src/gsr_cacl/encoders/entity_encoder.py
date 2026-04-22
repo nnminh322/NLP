@@ -361,7 +361,7 @@ class SharedEncoder(nn.Module):
         Uses shared backbone with gradient flow.
         """
         device = next(self.backbone.parameters()).device
-        return self.entity_encoder.encode(companies, years, sectors, device)
+        return self.entity_encoder.forward(companies, years, sectors, device)
 
     def forward(
         self,

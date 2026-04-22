@@ -330,14 +330,21 @@ def stage_joint(encoder, scorer, gat_encoder, dataset, device, entity_registry,
             neg_scores_t = torch.stack(neg_scores_list)
             violates_t = torch.tensor(violates_list, dtype=torch.float32, device=device)
 
-            # Align dimensions (ensure at least B negatives)
-            neg_for_triplet = neg_scores_t[:B] if len(neg_scores_t) >= B else neg_scores_t
-            if len(neg_for_triplet) < B:
-                pad = torch.zeros(B - len(neg_for_triplet), device=device)
-                neg_for_triplet = torch.cat([neg_for_triplet, pad])
+            # Align dimensions (ensure the negative scores and violation mask match)
+            neg_for_loss = neg_scores_t
+            violates_for_loss = violates_t
+            if len(neg_for_loss) >= B:
+                neg_for_loss = neg_for_loss[:B]
+                violates_for_loss = violates_for_loss[:B]
+            else:
+                pad_len = B - len(neg_for_loss)
+                neg_pad = torch.zeros(pad_len, device=device)
+                mask_pad = torch.zeros(pad_len, device=device)
+                neg_for_loss = torch.cat([neg_for_loss, neg_pad])
+                violates_for_loss = torch.cat([violates_for_loss, mask_pad])
 
             # CACL loss: triplet + constraint violation
-            losses = caclloss(pos_scores_t, neg_for_triplet, violates_t)
+            losses = caclloss(pos_scores_t, neg_for_loss, violates_for_loss)
 
             # EntitySupConLoss: entity clustering
             entity_labels = entity_registry.build_entity_labels(companies)

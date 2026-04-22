@@ -133,6 +133,12 @@ class GATLayer(nn.Module):
         H = self.num_heads
         F_h = self.head_features
 
+        if entity_embeddings is not None:
+            if entity_embeddings.dim() == 1:
+                entity_embeddings = entity_embeddings.unsqueeze(0)
+            if entity_embeddings.size(0) == 1 and V > 1:
+                entity_embeddings = entity_embeddings.expand(V, -1)
+
         # Step 1: Project to Q, K, V
         Q = self.W_q(h).view(V, H, F_h)   # [V, H, F_h]
         K = self.W_k(h).view(V, H, F_h)
