@@ -278,8 +278,13 @@ class GATEncoder(nn.Module):
 
         # FIX BUG 4: Concat entity embeddings into node features (Eq.4)
         # x_v = [cell ⊕ PE(row) ⊕ PE(col) ⊕ e_D]
-        if self._has_entity and entity_embeddings is not None:
-            entity_proj = self.entity_proj(entity_embeddings)  # [V, _proj_entity_dim=embed_dim]
+        if self._has_entity:
+            if entity_embeddings is not None:
+                entity_proj = self.entity_proj(entity_embeddings)  # [V, _proj_entity_dim=embed_dim]
+            else:
+                entity_proj = torch.zeros(
+                    V, self._proj_entity_dim, dtype=cell_embeds.dtype, device=device
+                )
             h = torch.cat([cell_embeds, row_pos, col_pos, entity_proj], dim=-1)
         else:
             h = torch.cat([cell_embeds, row_pos, col_pos], dim=-1)

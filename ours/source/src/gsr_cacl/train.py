@@ -116,6 +116,8 @@ def stage_identity(encoder, scorer, gat_encoder, dataset, device, entity_registr
 
     for epoch in range(epochs):
         total_loss = trip_loss = supcon_loss_total = 0.0
+        pos_mean_total = 0.0
+        neg_mean_total = 0.0
         n_batches = 0
 
         for batch in tqdm(dataloader, desc=f"Identity Epoch {epoch+1}"):
@@ -167,6 +169,12 @@ def stage_identity(encoder, scorer, gat_encoder, dataset, device, entity_registr
                 pos_scores = scorer(q_text_emb, d_text_emb, kg_dummy, None, None, cs_feats)
                 neg_scores = scorer(q_text_emb, neg_text_emb, kg_dummy, None, None, cs_feats)
             loss_triplet = triplet_loss(pos_scores, neg_scores)
+            # Accumulate per-batch mean scores for debugging / sanity checks
+            try:
+                pos_mean_total += float(pos_scores.mean().item())
+                neg_mean_total += float(neg_scores.mean().item())
+            except Exception:
+                pass
             loss_total = loss_triplet + loss_supcon
 
             optimizer.zero_grad()
@@ -183,6 +191,13 @@ def stage_identity(encoder, scorer, gat_encoder, dataset, device, entity_registr
             f"Epoch {epoch+1} — Loss: {total_loss/max(n_batches,1):.4f} "
             f"(triplet={trip_loss/max(n_batches,1):.4f}, supcon={supcon_loss_total/max(n_batches,1):.4f})"
         )
+        # Log average per-epoch pos/neg means to help debug stalled triplet loss
+        try:
+            avg_pos = pos_mean_total / max(n_batches, 1)
+            avg_neg = neg_mean_total / max(n_batches, 1)
+            logger.info(f"Epoch {epoch+1} — Pos mean: {avg_pos:.4f}, Neg mean: {avg_neg:.4f}")
+        except Exception:
+            pass
 
 
 # ─── Stage 2 ───────────────────────────────────────────────────────────────────
