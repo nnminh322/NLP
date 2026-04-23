@@ -111,6 +111,8 @@ def stage_identity(encoder, scorer, gat_encoder, dataset, device, entity_registr
     scorer.train()
 
     supcon_loss = EntitySupConLoss(temperature=0.07) if use_entity_signal else None
+    if not use_entity_signal:
+        logger.info("Entity signal disabled: using in-batch text negatives for triplet loss")
 
     for epoch in range(epochs):
         total_loss = trip_loss = supcon_loss_total = 0.0
@@ -152,6 +154,8 @@ def stage_identity(encoder, scorer, gat_encoder, dataset, device, entity_registr
                 neg_entity_emb = encoder.entity_encode(neg_companies, neg_years, neg_sectors)
             else:
                 loss_supcon = torch.tensor(0.0, device=device)
+                neg_docs = [batch[(i + 1) % B].positive_context[:512] for i in range(B)]
+                neg_text_emb = encoder.text_encode(neg_docs)
 
             kg_dummy = torch.zeros(B, gat_encoder.hidden_dim, device=device)
             cs_feats = torch.tensor([[1.0, 0.0, 0.0]] * B, device=device)
@@ -161,7 +165,7 @@ def stage_identity(encoder, scorer, gat_encoder, dataset, device, entity_registr
                 neg_scores = scorer(q_text_emb, d_text_emb, kg_dummy, q_entity_emb, neg_entity_emb, cs_feats)
             else:
                 pos_scores = scorer(q_text_emb, d_text_emb, kg_dummy, None, None, cs_feats)
-                neg_scores = scorer(q_text_emb, d_text_emb, kg_dummy, None, None, cs_feats)
+                neg_scores = scorer(q_text_emb, neg_text_emb, kg_dummy, None, None, cs_feats)
             loss_triplet = triplet_loss(pos_scores, neg_scores)
             loss_total = loss_triplet + loss_supcon
 
