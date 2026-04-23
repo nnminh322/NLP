@@ -16,20 +16,13 @@ import argparse
 import logging
 from collections import Counter
 
-from datasets import load_dataset
 from tqdm import tqdm
 
+from gsr_cacl.datasets.local_data import DATASET_CONFIGS, load_local_split_df
 from gsr_cacl.templates import TEMPLATES, match_template, normalize_header
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
-
-DATASET_SPLITS = {
-    "finqa": ("G4KMU/t2-ragbench", "FinQA", "FinQA"),
-    "convfinqa": ("G4KMU/t2-ragbench", "ConvFinQA", "ConvFinQA"),
-    "tatqa": ("G4KMU/t2-ragbench", "TAT-DQA", "TAT-DQA"),
-}
-
 
 def extract_table_headers(content: str) -> list[str]:
     """Extract headers from the first markdown table in content."""
@@ -47,14 +40,13 @@ def extract_table_headers(content: str) -> list[str]:
 
 
 def survey_coverage(
-    dataset_name: str,
     config_name: str | None,
     split: str,
     sample_size: int = 200,
 ) -> dict:
     """Survey template matching coverage on a sample of documents."""
-    logger.info(f"Loading dataset: {dataset_name}/{config_name} ({split})")
-    df = load_dataset(dataset_name, config_name, split=split).to_pandas()
+    logger.info(f"Loading local dataset: {config_name} ({split})")
+    df = load_local_split_df(config_name, split)
 
     if sample_size and sample_size < len(df):
         df = df.sample(n=sample_size, random_state=42)
@@ -142,8 +134,8 @@ def main() -> None:
     parser.add_argument("--sample", type=int, default=300)
     args = parser.parse_args()
 
-    ds_cfg = DATASET_SPLITS[args.dataset]
-    results = survey_coverage(ds_cfg[0], ds_cfg[1], ds_cfg[2], args.sample)
+    ds_cfg = DATASET_CONFIGS[args.dataset]
+    results = survey_coverage(ds_cfg["config_name"], ds_cfg["eval_split"], args.sample)
     print_report(results, args.dataset)
 
 

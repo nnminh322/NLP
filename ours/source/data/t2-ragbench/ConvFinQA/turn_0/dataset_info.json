@@ -1,0 +1,118 @@
+{
+  "builder_name": "json",
+  "citation": "",
+  "config_name": "ConvFinQA",
+  "dataset_name": "t2-ragbench",
+  "dataset_size": 28984862,
+  "description": "",
+  "download_checksums": {
+    "hf://datasets/G4KMU/t2-ragbench@adf7fe1541ac37351ce1142544d8e3b43010ed92/data/ConvFinQA/turn_0.jsonl": {
+      "num_bytes": 30038650,
+      "checksum": null
+    }
+  },
+  "download_size": 30038650,
+  "features": {
+    "id": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "context_id": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "split": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "question": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "program_answer": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "original_answer": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "context": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "table": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "pre_text": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "post_text": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "file_name": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "company_name": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "company_symbol": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "report_year": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "page_number": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "company_sector": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "company_industry": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "company_headquarters": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "company_date_added": {
+      "dtype": "timestamp[s]",
+      "_type": "Value"
+    },
+    "company_cik": {
+      "dtype": "int64",
+      "_type": "Value"
+    },
+    "company_founded": {
+      "dtype": "string",
+      "_type": "Value"
+    }
+  },
+  "homepage": "",
+  "license": "",
+  "size_in_bytes": 59023512,
+  "splits": {
+    "turn_0": {
+      "name": "turn_0",
+      "num_bytes": 28984862,
+      "num_examples": 3458,
+      "dataset_name": "t2-ragbench"
+    }
+  },
+  "version": {
+    "version_str": "0.0.0",
+    "major": 0,
+    "minor": 0,
+    "patch": 0
+  }
+}

@@ -112,6 +112,7 @@ def run_gsr_benchmark(
     output_dir: Path | None = None,
     sample_size: int | None = None,
     checkpoint_path: str | None = None,
+    use_entity_signal: bool = True,
 ) -> dict:
     """
     Run GSR retrieval benchmark on a T²-RAGBench subset.
@@ -179,6 +180,7 @@ def run_gsr_benchmark(
         contr_version=gsr_params.get("contr_version", "v1"),
         rel_tol=gsr_params.get("rel_tol", 1e-3),
         contr1=gsr_params.get("contr1", "v1"),
+        use_entity_signal=use_entity_signal,
     )
 
     # Run retrieval
@@ -257,6 +259,7 @@ def _main_hydra() -> None:
             cfg.get("model", {}).get("embedding", {}).get("name", "intfloat/multilingual-e5-large-instruct")
 
         checkpoint_path = gsr_params.pop("checkpoint", None)
+        use_entity_signal = gsr_params.pop("use_entity_signal", True)
         run_gsr_benchmark(
             mode=cfg.mode,
             config_name=ds.config_name,
@@ -267,6 +270,7 @@ def _main_hydra() -> None:
             device=None,
             sample_size=cfg.get("eval", {}).get("sample_size"),
             checkpoint_path=checkpoint_path,
+            use_entity_signal=use_entity_signal,
         )
 
     _run()
@@ -304,6 +308,10 @@ def _main_argparse() -> None:
         "--rel-tol", type=float, default=1e-3,
         help="Relative tolerance for contr2 (v2 only). Default: 1e-3 (0.1%% relative error)."
     )
+    parser.add_argument(
+        "--disable-entity-signal", action="store_true",
+        help="Disable entity embeddings and entity score fusion; use text + KG only."
+    )
     args = parser.parse_args()
 
     from gsr_cacl.scoring.constraint_score import ConstraintScoringVersion
@@ -330,6 +338,7 @@ def _main_argparse() -> None:
             sample_size=args.sample,
             gsr_params=gsr_params,
             checkpoint_path=args.checkpoint,
+            use_entity_signal=not args.disable_entity_signal,
         )
     except Exception as e:
         logger.error(f"Benchmark failed: {e}", exc_info=True)

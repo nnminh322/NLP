@@ -1,0 +1,98 @@
+{
+  "builder_name": "json",
+  "citation": "",
+  "config_name": "TAT-DQA",
+  "dataset_name": "t2-ragbench",
+  "dataset_size": 51142086,
+  "description": "",
+  "download_checksums": {
+    "hf://datasets/G4KMU/t2-ragbench@adf7fe1541ac37351ce1142544d8e3b43010ed92/data/TAT-DQA/train/metadata.jsonl": {
+      "num_bytes": 42633243,
+      "checksum": null
+    },
+    "hf://datasets/G4KMU/t2-ragbench@adf7fe1541ac37351ce1142544d8e3b43010ed92/data/TAT-DQA/dev/metadata.jsonl": {
+      "num_bytes": 5464915,
+      "checksum": null
+    },
+    "hf://datasets/G4KMU/t2-ragbench@adf7fe1541ac37351ce1142544d8e3b43010ed92/data/TAT-DQA/test/metadata.jsonl": {
+      "num_bytes": 5284734,
+      "checksum": null
+    }
+  },
+  "download_size": 53382892,
+  "features": {
+    "id": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "context_id": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "split": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "question": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "program_answer": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "original_answer": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "context": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "file_name": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "company_name": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "report_year": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "company_sector": {
+      "dtype": "string",
+      "_type": "Value"
+    }
+  },
+  "homepage": "",
+  "license": "",
+  "size_in_bytes": 104524978,
+  "splits": {
+    "train": {
+      "name": "train",
+      "num_bytes": 40836531,
+      "num_examples": 9063,
+      "dataset_name": "t2-ragbench"
+    },
+    "dev": {
+      "name": "dev",
+      "num_bytes": 5243510,
+      "num_examples": 1142,
+      "dataset_name": "t2-ragbench"
+    },
+    "test": {
+      "name": "test",
+      "num_bytes": 5062045,
+      "num_examples": 1144,
+      "dataset_name": "t2-ragbench"
+    }
+  },
+  "version": {
+    "version_str": "0.0.0",
+    "major": 0,
+    "minor": 0,
+    "patch": 0
+  }
+}

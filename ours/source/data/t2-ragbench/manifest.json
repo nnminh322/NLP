@@ -1,0 +1,38 @@
+{
+  "dataset_name": "G4KMU/t2-ragbench",
+  "data_root": "/Users/nhatminhnguyen/Library/Mobile Documents/com~apple~CloudDocs/Tha\u0323c si\u0303/Xu\u031b\u0309 ly\u0301 ngo\u0302n ngu\u031b\u0303 tu\u031b\u0323 nhie\u0302n/project/ours/source/data/t2-ragbench",
+  "created_at": "2026-04-23T10:48:05",
+  "items": [
+    {
+      "dataset_key": "finqa",
+      "config_name": "FinQA",
+      "path": "/Users/nhatminhnguyen/Library/Mobile Documents/com~apple~CloudDocs/Tha\u0323c si\u0303/Xu\u031b\u0309 ly\u0301 ngo\u0302n ngu\u031b\u0303 tu\u031b\u0323 nhie\u0302n/project/ours/source/data/t2-ragbench/FinQA",
+      "split_sizes": {
+        "train": 6251,
+        "dev": 883,
+        "test": 1147
+      },
+      "skipped": false
+    },
+    {
+      "dataset_key": "convfinqa",
+      "config_name": "ConvFinQA",
+      "path": "/Users/nhatminhnguyen/Library/Mobile Documents/com~apple~CloudDocs/Tha\u0323c si\u0303/Xu\u031b\u0309 ly\u0301 ngo\u0302n ngu\u031b\u0303 tu\u031b\u0323 nhie\u0302n/project/ours/source/data/t2-ragbench/ConvFinQA",
+      "split_sizes": {
+        "turn_0": 3458
+      },
+      "skipped": false
+    },
+    {
+      "dataset_key": "tatqa",
+      "config_name": "TAT-DQA",
+      "path": "/Users/nhatminhnguyen/Library/Mobile Documents/com~apple~CloudDocs/Tha\u0323c si\u0303/Xu\u031b\u0309 ly\u0301 ngo\u0302n ngu\u031b\u0303 tu\u031b\u0323 nhie\u0302n/project/ours/source/data/t2-ragbench/TAT-DQA",
+      "split_sizes": {
+        "train": 9063,
+        "dev": 1142,
+        "test": 1144
+      },
+      "skipped": false
+    }
+  ]
+}

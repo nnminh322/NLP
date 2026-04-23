@@ -25,7 +25,6 @@ from __future__ import annotations
 import argparse
 import logging
 from pathlib import Path
-from typing import Literal
 
 import torch
 import torch.nn.functional as F
@@ -33,7 +32,6 @@ from tqdm import tqdm
 
 from gsr_cacl.training import (
     RetrievalDataset,
-    RetrievalSample,
     CACLLoss,
     TripletLoss,
     EntitySupConLoss,
@@ -86,30 +84,19 @@ def build_encoder(
 
 
 def load_training_data(dataset, split="train"):
-    from datasets import load_dataset
+    from gsr_cacl.datasets.wrappers import load_t2ragbench_train_samples
+
     ds_cfg = DATASET_CONFIGS[dataset]
     hf_split = ds_cfg["train_split"] if split == "train" else ds_cfg["eval_split"]
-    logger.info(f"Loading {hf_split} split for {dataset}...")
-    df = load_dataset("G4KMU/t2-ragbench", ds_cfg["config_name"], split=hf_split).to_pandas()
-    samples = []
-    for _, row in tqdm(df.iterrows(), total=len(df), desc="Preparing samples"):
-        sample = RetrievalSample(
-            query=f"{row.get('company_name', '')}: {row.get('question', '')}",
-            positive_context=str(row.get("context", "")),
-            negative_contexts=[],
-            company_name=str(row.get("company_name", "")),
-            report_year=str(row.get("report_year", "")),
-            company_sector=str(row.get("company_sector", "")),
-        )
-        samples.append(sample)
-    logger.info(f"Loaded {len(samples)} training samples")
-    return samples
+    logger.info(f"Loading local {hf_split} split for {dataset}...")
+    return load_t2ragbench_train_samples(ds_cfg["config_name"], split=hf_split)
 
 
 # ─── Stage 1 ───────────────────────────────────────────────────────────────────
 
 def stage_identity(encoder, scorer, gat_encoder, dataset, device, entity_registry,
-                   epochs=3, lr=1e-4, batch_size=16, entity_dim=256):
+                   epochs=3, lr=1e-4, batch_size=16, entity_dim=256,
+                   use_entity_signal: bool = True):
     logger.info("=== Stage 1: Identity Pretraining ===")
     params = _collect_trainable_params(encoder, scorer)
     optimizer = torch.optim.AdamW(params, lr=lr, weight_decay=0.01)
@@ -122,6 +109,8 @@ def stage_identity(encoder, scorer, gat_encoder, dataset, device, entity_registr
     )
     encoder.train()
     scorer.train()
+
+    supcon_loss = EntitySupConLoss(temperature=0.07) if use_entity_signal else None
 
     for epoch in range(epochs):
         total_loss = trip_loss = supcon_loss_total = 0.0
@@ -136,36 +125,43 @@ def stage_identity(encoder, scorer, gat_encoder, dataset, device, entity_registr
             q_text_emb = encoder.text_encode(queries)
             d_text_emb = encoder.text_encode(docs)
 
-            # FIX ISSUE 5: Different entity representations for Q vs D
-            # Query → original name, Doc → canonical name from registry
-            q_companies = [s.company_name for s in batch]
-            q_years = [s.report_year for s in batch]
-            q_sectors = [s.company_sector for s in batch]
-            d_companies = [
-                entity_registry.get_canonical_name(s.company_name) or s.company_name
-                for s in batch
-            ]
-            d_years = [s.report_year for s in batch]
-            d_sectors = [s.company_sector for s in batch]
+            if use_entity_signal:
+                # FIX ISSUE 5: Different entity representations for Q vs D
+                # Query → original name, Doc → canonical name from registry
+                q_companies = [s.company_name for s in batch]
+                q_years = [s.report_year for s in batch]
+                q_sectors = [s.company_sector for s in batch]
+                d_companies = [
+                    entity_registry.get_canonical_name(s.company_name) or s.company_name
+                    for s in batch
+                ]
+                d_years = [s.report_year for s in batch]
+                d_sectors = [s.company_sector for s in batch]
 
-            q_entity_emb = encoder.entity_encode(q_companies, q_years, q_sectors)
-            d_entity_emb = encoder.entity_encode(d_companies, d_years, d_sectors)
+                q_entity_emb = encoder.entity_encode(q_companies, q_years, q_sectors)
+                d_entity_emb = encoder.entity_encode(d_companies, d_years, d_sectors)
 
-            # SupCon loss: learn that "Apple" and "Apple Inc." are the same entity
-            entity_labels = entity_registry.build_entity_labels(q_companies)
-            loss_supcon = supcon_loss(q_entity_emb, entity_labels)
+                # SupCon loss: learn that "Apple" and "Apple Inc." are the same entity
+                entity_labels = entity_registry.build_entity_labels(q_companies)
+                loss_supcon = supcon_loss(q_entity_emb, entity_labels)
 
-            # Triplet loss: negatives swap entity within batch
-            neg_companies = [batch[(i + 1) % B].company_name for i in range(B)]
-            neg_years = [batch[(i + 1) % B].report_year for i in range(B)]
-            neg_sectors = [batch[(i + 1) % B].company_sector for i in range(B)]
-            neg_entity_emb = encoder.entity_encode(neg_companies, neg_years, neg_sectors)
+                # Triplet loss: negatives swap entity within batch
+                neg_companies = [batch[(i + 1) % B].company_name for i in range(B)]
+                neg_years = [batch[(i + 1) % B].report_year for i in range(B)]
+                neg_sectors = [batch[(i + 1) % B].company_sector for i in range(B)]
+                neg_entity_emb = encoder.entity_encode(neg_companies, neg_years, neg_sectors)
+            else:
+                loss_supcon = torch.tensor(0.0, device=device)
 
             kg_dummy = torch.zeros(B, gat_encoder.hidden_dim, device=device)
             cs_feats = torch.tensor([[1.0, 0.0, 0.0]] * B, device=device)
 
-            pos_scores = scorer(q_text_emb, d_text_emb, kg_dummy, q_entity_emb, d_entity_emb, cs_feats)
-            neg_scores = scorer(q_text_emb, d_text_emb, kg_dummy, q_entity_emb, neg_entity_emb, cs_feats)
+            if use_entity_signal:
+                pos_scores = scorer(q_text_emb, d_text_emb, kg_dummy, q_entity_emb, d_entity_emb, cs_feats)
+                neg_scores = scorer(q_text_emb, d_text_emb, kg_dummy, q_entity_emb, neg_entity_emb, cs_feats)
+            else:
+                pos_scores = scorer(q_text_emb, d_text_emb, kg_dummy, None, None, cs_feats)
+                neg_scores = scorer(q_text_emb, d_text_emb, kg_dummy, None, None, cs_feats)
             loss_triplet = triplet_loss(pos_scores, neg_scores)
             loss_total = loss_triplet + loss_supcon
 
@@ -241,7 +237,8 @@ def stage_structural(encoder, scorer, gat_encoder, dataset, device,
 def stage_joint(encoder, scorer, gat_encoder, dataset, device, entity_registry,
                epochs=5, batch_size=16, lr=5e-5, margin=0.2,
                lambda_constraint=0.5, lambda_entity=0.5, save_path=None,
-               contr_version="v1", entity_dim=256, add_entity_sim=False):
+               contr_version="v1", entity_dim=256, add_entity_sim=False,
+               use_entity_signal: bool = True):
     logger.info("=== Stage 3: Joint Finetuning (CACL) ===")
     params = _collect_trainable_params(encoder, scorer, gat_encoder)
     optimizer = torch.optim.AdamW(params, lr=lr, weight_decay=0.01)
@@ -260,6 +257,8 @@ def stage_joint(encoder, scorer, gat_encoder, dataset, device, entity_registry,
     scorer.train()
     gat_encoder.train()
 
+    supcon_loss = EntitySupConLoss(temperature=0.07) if use_entity_signal else None
+
     for epoch in range(epochs):
         total = trip_total = const_total = supcon_total = 0.0
         n_batches = 0
@@ -268,12 +267,13 @@ def stage_joint(encoder, scorer, gat_encoder, dataset, device, entity_registry,
             B = len(batch)
             companies, years, sectors = _batch_meta_to_tensors(batch, device)
 
-            # FIX ISSUE 5: Q uses original names, D uses canonical names
-            d_companies = [
-                entity_registry.get_canonical_name(c) or c for c in companies
-            ]
-            q_entity_emb = encoder.entity_encode(companies, years, sectors)
-            d_entity_emb = encoder.entity_encode(d_companies, years, sectors)
+            if use_entity_signal:
+                # FIX ISSUE 5: Q uses original names, D uses canonical names
+                d_companies = [
+                    entity_registry.get_canonical_name(c) or c for c in companies
+                ]
+                q_entity_emb = encoder.entity_encode(companies, years, sectors)
+                d_entity_emb = encoder.entity_encode(d_companies, years, sectors)
 
             pos_scores_list = []
             neg_scores_list = []
@@ -283,15 +283,16 @@ def stage_joint(encoder, scorer, gat_encoder, dataset, device, entity_registry,
                 q_text_emb = encoder.text_encode([sample.query])
                 d_text_emb = encoder.text_encode([sample.positive_context[:512]])
 
-                # FIX ISSUE 6: Index into correct entity embeddings for this sample
-                q_e = q_entity_emb[idx:idx+1]   # [1, entity_dim]
-                d_e = d_entity_emb[idx:idx+1]   # [1, entity_dim]
+                if use_entity_signal:
+                    # FIX ISSUE 6: Index into correct entity embeddings for this sample
+                    q_e = q_entity_emb[idx:idx+1]   # [1, entity_dim]
+                    d_e = d_entity_emb[idx:idx+1]   # [1, entity_dim]
 
                 # KG + constraint for positive
                 pos_kg = build_constraint_kg(sample.positive_context)
                 # FIX ISSUE 9: Pass entity embeddings to GAT if EntitySim is enabled
-                if add_entity_sim and gat_encoder.add_entity_sim:
-                    ent_emb_for_kg = q_e.squeeze(0)      # [entity_dim]
+                if use_entity_signal and add_entity_sim and gat_encoder.add_entity_sim:
+                    ent_emb_for_kg = q_entity_emb[idx:idx+1].squeeze(0)      # [entity_dim]
                     pos_kg_emb = gat_encoder.encode_graph(
                         pos_kg, entity_embeddings=ent_emb_for_kg.unsqueeze(0)
                     ).unsqueeze(0)
@@ -300,7 +301,10 @@ def stage_joint(encoder, scorer, gat_encoder, dataset, device, entity_registry,
 
                 pos_cs = compute_constraint_score(pos_kg, version=contr_version)
                 pos_cs_feats = scorer.build_constraint_features([pos_cs], device)
-                pos_score = scorer(q_text_emb, d_text_emb, pos_kg_emb, q_e, d_e, pos_cs_feats)
+                if use_entity_signal:
+                    pos_score = scorer(q_text_emb, d_text_emb, pos_kg_emb, q_e, d_e, pos_cs_feats)
+                else:
+                    pos_score = scorer(q_text_emb, d_text_emb, pos_kg_emb, None, None, pos_cs_feats)
                 pos_scores_list.append(pos_score.squeeze(0))
 
                 # CHAP negatives
@@ -311,7 +315,7 @@ def stage_joint(encoder, scorer, gat_encoder, dataset, device, entity_registry,
 
                 for neg in negs:
                     neg_kg = build_constraint_kg(neg.table_md)
-                    if add_entity_sim and gat_encoder.add_entity_sim:
+                    if use_entity_signal and add_entity_sim and gat_encoder.add_entity_sim:
                         neg_kg_emb = gat_encoder.encode_graph(
                             neg_kg, entity_embeddings=ent_emb_for_kg.unsqueeze(0)
                         ).unsqueeze(0)
@@ -321,7 +325,10 @@ def stage_joint(encoder, scorer, gat_encoder, dataset, device, entity_registry,
                     neg_text_emb = encoder.text_encode([neg.table_md[:512]])
                     neg_cs = compute_constraint_score(neg_kg, version=contr_version)
                     neg_cs_feats = scorer.build_constraint_features([neg_cs], device)
-                    neg_score = scorer(q_text_emb, neg_text_emb, neg_kg_emb, q_e, d_e, neg_cs_feats)
+                    if use_entity_signal:
+                        neg_score = scorer(q_text_emb, neg_text_emb, neg_kg_emb, q_e, d_e, neg_cs_feats)
+                    else:
+                        neg_score = scorer(q_text_emb, neg_text_emb, neg_kg_emb, None, None, neg_cs_feats)
                     neg_scores_list.append(neg_score.squeeze(0))
                     violates_list.append(1.0 if neg.is_violated else 0.0)
 
@@ -347,8 +354,11 @@ def stage_joint(encoder, scorer, gat_encoder, dataset, device, entity_registry,
             losses = caclloss(pos_scores_t, neg_for_loss, violates_for_loss)
 
             # EntitySupConLoss: entity clustering
-            entity_labels = entity_registry.build_entity_labels(companies)
-            loss_supcon = supcon_loss(q_entity_emb, entity_labels)
+            if use_entity_signal:
+                entity_labels = entity_registry.build_entity_labels(companies)
+                loss_supcon = supcon_loss(q_entity_emb, entity_labels)
+            else:
+                loss_supcon = torch.tensor(0.0, device=device)
 
             loss_total = losses["total"] + lambda_entity * loss_supcon
 
@@ -416,7 +426,11 @@ def main():
     parser.add_argument("--contr2", default="v1", choices=["v1", "v2"])
     parser.add_argument("--add-entity-sim", action="store_true",
                         help="Enable EntitySim in GAT attention")
+    parser.add_argument("--disable-entity-signal", action="store_true",
+                        help="Disable entity embeddings and EntitySupConLoss; keep text + KG only")
     args = parser.parse_args()
+
+    use_entity_signal = not args.disable_entity_signal
 
     if args.preset:
         p = ENCODER_PRESETS[args.preset]
@@ -442,12 +456,13 @@ def main():
     gat_encoder = GATEncoder(
         embed_dim=embed_dim, hidden_dim=256, num_heads=4, num_layers=2,
         numeric_encoder=numeric_mod, numeric_version=args.contr1,
-        entity_embed_dim=args.entity_dim, add_entity_sim=args.add_entity_sim,
+        entity_embed_dim=args.entity_dim, add_entity_sim=(args.add_entity_sim and use_entity_signal),
     ).to(device)
 
     scorer = JointScorer(
         text_embed_dim=embed_dim, kg_embed_dim=gat_encoder.output_dim,
         entity_embed_dim=args.entity_dim, hidden_dim=64,
+        use_entity_signal=use_entity_signal,
     ).to(device)
 
     entity_registry = EntityRegistry()
@@ -461,9 +476,13 @@ def main():
         f"Scorer={sc_params:,} = {enc_params+gat_params+sc_params:,}"
     )
 
+    if not use_entity_signal:
+        logger.info("Entity signal disabled: training with text + KG only")
+
     if args.stage in ("identity", "all"):
         stage_identity(encoder, scorer, gat_encoder, samples, device, entity_registry,
-                       epochs=args.epochs, lr=args.lr, batch_size=args.batch_size, entity_dim=args.entity_dim)
+                       epochs=args.epochs, lr=args.lr, batch_size=args.batch_size,
+                       entity_dim=args.entity_dim, use_entity_signal=use_entity_signal)
 
     if args.stage in ("structural", "all"):
         stage_structural(encoder, scorer, gat_encoder, samples, device,
@@ -475,7 +494,7 @@ def main():
                     epochs=args.epochs, batch_size=args.batch_size, lr=args.lr, margin=args.margin,
                     lambda_constraint=args.lambda_constraint, lambda_entity=args.lambda_entity,
                     save_path=save_path, contr_version=args.contr2, entity_dim=args.entity_dim,
-                    add_entity_sim=args.add_entity_sim)
+                    add_entity_sim=args.add_entity_sim, use_entity_signal=use_entity_signal)
 
     save_path.mkdir(parents=True, exist_ok=True)
     torch.save({

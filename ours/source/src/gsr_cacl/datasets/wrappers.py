@@ -1,22 +1,25 @@
 """Dataset loaders for T²-RAGBench subsets.
 
-Loads FinQA, ConvFinQA, TAT-DQA from the public HuggingFace dataset
-"G4KMU/t2-ragbench" and converts them into GSR-CACL core types.
+Loads FinQA, ConvFinQA, TAT-DQA from a local repository snapshot and
+converts them into GSR-CACL core types.
 
-No dependency on g4k — uses datasets + pandas directly.
+The local snapshot is created once by `data/download_t2ragbench.py` and then
+used offline by all training and evaluation code.
 """
 
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from datasets import load_dataset, DatasetDict
 from tqdm import tqdm
 
 from gsr_cacl.core import Document, DatasetSplit
 from gsr_cacl.datasets.gsr_document import GSRDocument
+from gsr_cacl.datasets.local_data import load_local_dataset, load_local_split_df
+from gsr_cacl.training.data import RetrievalSample
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +88,23 @@ def _build_queries(df: pd.DataFrame) -> tuple[list[str], list[str], list[dict]]:
     return queries, gt_ids, metas
 
 
+def _build_training_samples(df: pd.DataFrame) -> list[RetrievalSample]:
+    """Convert a DataFrame into retrieval training samples."""
+    samples: list[RetrievalSample] = []
+    for _, row in df.iterrows():
+        samples.append(
+            RetrievalSample(
+                query=f"{row.get('company_name', '')}: {row.get('question', '')}",
+                positive_context=str(row.get("context", "")),
+                negative_contexts=[],
+                company_name=str(row.get("company_name", "")),
+                report_year=str(row.get("report_year", "")),
+                company_sector=str(row.get("company_sector", "")),
+            )
+        )
+    return samples
+
+
 # ------------------------------------------------------------------
 # Public loaders
 # ------------------------------------------------------------------
@@ -94,6 +114,7 @@ def load_t2ragbench_split(
     split: str = "test",
     corpus_splits: list[str] | None = None,
     sample_size: int | None = None,
+    data_root: str | Path | None = None,
 ) -> DatasetSplit:
     """
     Load a T2-RAGBench subset as a DatasetSplit.
@@ -106,19 +127,17 @@ def load_t2ragbench_split(
     Returns:
         DatasetSplit with queries, ground-truth IDs, corpus, metadata
     """
-    dataset_name = "G4KMU/t2-ragbench"
-
-    # Load QA split
-    logger.info(f"Loading {dataset_name}/{config_name} split={split}")
-    qa_df = load_dataset(dataset_name, config_name, split=split).to_pandas()
+    # Load QA split from local snapshot
+    logger.info(f"Loading local dataset snapshot {config_name} split={split}")
+    qa_df = load_local_split_df(config_name, split, data_root=data_root)
     if sample_size and sample_size < len(qa_df):
         qa_df = qa_df.sample(n=sample_size, random_state=42)
 
-    # Load corpus (all splits)
-    logger.info("Loading full corpus...")
-    full = load_dataset(dataset_name, config_name)
+    # Load corpus (all splits) from the same local snapshot
+    logger.info("Loading full local corpus...")
+    full = load_local_dataset(config_name, data_root=data_root)
     corpus_dfs = []
-    if isinstance(full, DatasetDict):
+    if hasattr(full, "keys") and hasattr(full, "__getitem__"):
         target_splits = corpus_splits or list(full.keys())
         for s in target_splits:
             if s in full:
@@ -138,6 +157,22 @@ def load_t2ragbench_split(
         meta_data=metas,
         name=config_name,
     )
+
+
+def load_t2ragbench_train_samples(
+    config_name: str,
+    split: str = "train",
+    sample_size: int | None = None,
+    data_root: str | Path | None = None,
+) -> list[RetrievalSample]:
+    """Load training samples from the local dataset snapshot."""
+    logger.info(f"Loading local training split {config_name}/{split}")
+    df = load_local_split_df(config_name, split, data_root=data_root)
+    if sample_size and sample_size < len(df):
+        df = df.sample(n=sample_size, random_state=42)
+    samples = _build_training_samples(df)
+    logger.info(f"Loaded {len(samples)} training samples from local snapshot")
+    return samples
 
 
 # ------------------------------------------------------------------

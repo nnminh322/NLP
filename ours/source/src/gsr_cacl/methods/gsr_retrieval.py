@@ -60,6 +60,7 @@ class GSRRetrieval:
         contr_version: ConstraintScoringVersion = "v1",
         rel_tol: float = 1e-3,
         contr1: str = "v1",
+        use_entity_signal: bool = True,
     ):
         self.corpus = corpus
         self.embedding_function = embedding_function
@@ -71,6 +72,7 @@ class GSRRetrieval:
         self.contr_version: ConstraintScoringVersion = contr_version
         self.rel_tol = rel_tol
         self.contr1 = contr1
+        self.use_entity_signal = use_entity_signal
 
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -119,7 +121,7 @@ class GSRRetrieval:
                     f"module={'ScaleAware' if numeric_mod is not None else 'log-scale'}")
 
         # SharedEncoder for entity embeddings — loaded from checkpoint if available
-        self.use_entity_embeddings = checkpoint_path is not None
+        self.use_entity_embeddings = checkpoint_path is not None and self.use_entity_signal
         self.shared_encoder: SharedEncoder | None = None
         if self.use_entity_embeddings:
             self.shared_encoder = self._build_shared_encoder(checkpoint_path)
@@ -129,6 +131,7 @@ class GSRRetrieval:
             text_embed_dim=self._embed_dim,
             kg_embed_dim=gat_hidden_dim,
             entity_embed_dim=self._ckpt_entity_dim,
+            use_entity_signal=self.use_entity_signal,
         ).to(self.device)
 
         # Load pre-trained weights
@@ -146,6 +149,9 @@ class GSRRetrieval:
             self._encode_all_entity_embeddings()
         else:
             self.doc_entity_embeds: list | None = None
+
+        if not self.use_entity_signal:
+            logger.info("Entity signal disabled: using text + KG only")
 
     def _build_shared_encoder(self, checkpoint_path: str) -> SharedEncoder:
         """Build SharedEncoder from checkpoint config, WITHOUT loading weights yet."""
@@ -186,7 +192,7 @@ class GSRRetrieval:
         self, query_meta: dict[str, Any] | None
     ) -> torch.Tensor | None:
         """Encode query entity metadata at query time. Returns None if no encoder."""
-        if self.shared_encoder is None or query_meta is None:
+        if not self.use_entity_signal or self.shared_encoder is None or query_meta is None:
             return None
 
         meta = query_meta if isinstance(query_meta, dict) else {}
@@ -311,8 +317,18 @@ class GSRRetrieval:
                 version=self.contr_version, relative_tolerance=self.rel_tol,
             )
 
+            # Entity signal disabled: use text + KG only
+            if not self.use_entity_signal:
+                with torch.no_grad():
+                    final_score = self.scorer.score_single(
+                        query_text_embed=q_tensor,
+                        doc_text_embed=doc_tensor,
+                        kg_embed=kg_embed,
+                        entity_score=0.0,
+                        constraint_result=cs_result,
+                    )
             # Use learned entity embeddings when available, fall back to exact match
-            if q_entity_emb is not None and self.doc_entity_embeds is not None:
+            elif q_entity_emb is not None and self.doc_entity_embeds is not None:
                 doc_entity_emb = self.doc_entity_embeds[corpus_idx].to(self.device)
                 with torch.no_grad():
                     final_score = self.scorer.score_single_learned(

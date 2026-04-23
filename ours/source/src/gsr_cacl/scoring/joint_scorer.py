@@ -49,6 +49,7 @@ class JointScorer(nn.Module):
         kg_embed_dim: int = 256,
         entity_embed_dim: int = 256,  # NEW: entity embedding dimension
         hidden_dim: int = 64,
+        use_entity_signal: bool = True,
     ):
         """
         Args:
@@ -61,6 +62,7 @@ class JointScorer(nn.Module):
         self.text_embed_dim = text_embed_dim
         self.kg_embed_dim = kg_embed_dim
         self.entity_embed_dim = entity_embed_dim
+        self.use_entity_signal = use_entity_signal
 
         # KG-enriched text projection: [doc_text ⊕ kg_embed] → hidden → score adjustment
         self.text_kg_proj = nn.Sequential(
@@ -185,9 +187,9 @@ class JointScorer(nn.Module):
         query_text_embed: torch.Tensor,     # [B, text_embed_dim]
         doc_text_embed: torch.Tensor,        # [B, text_embed_dim]
         kg_embed: torch.Tensor,              # [B, kg_embed_dim]
-        query_entity_embed: torch.Tensor,    # [B, entity_embed_dim] ← NEW
-        doc_entity_embed: torch.Tensor,     # [B, entity_embed_dim] ← NEW
-        constraint_features: torch.Tensor,     # [B, 3]
+        query_entity_embed: torch.Tensor | None = None,    # [B, entity_embed_dim]
+        doc_entity_embed: torch.Tensor | None = None,     # [B, entity_embed_dim]
+        constraint_features: torch.Tensor | None = None,     # [B, 3]
     ) -> torch.Tensor:
         """
         Full joint scoring (Eq.15 in proposal).
@@ -198,12 +200,22 @@ class JointScorer(nn.Module):
             query_text_embed: [B, text_embed_dim]
             doc_text_embed: [B, text_embed_dim]
             kg_embed: [B, kg_embed_dim]
-            query_entity_embed: [B, entity_embed_dim] ← NEW
-            doc_entity_embed: [B, entity_embed_dim] ← NEW
+            query_entity_embed: [B, entity_embed_dim] or None
+            doc_entity_embed: [B, entity_embed_dim] or None
             constraint_features: [B, 3]
         """
+        if constraint_features is None:
+            raise ValueError("constraint_features is required")
+
         s_text = self.forward_text_sim(query_text_embed, doc_text_embed, kg_embed)
-        s_entity = self.forward_entity_sim(query_entity_embed, doc_entity_embed)
+        if (
+            self.use_entity_signal
+            and query_entity_embed is not None
+            and doc_entity_embed is not None
+        ):
+            s_entity = self.forward_entity_sim(query_entity_embed, doc_entity_embed)
+        else:
+            s_entity = torch.zeros_like(s_text)
         s_constraint = self.forward_constraint(constraint_features)
 
         return self.alpha * s_text + self.beta * s_entity + self.gamma * s_constraint
@@ -236,10 +248,13 @@ class JointScorer(nn.Module):
         s_constraint = self.forward_constraint(cs_feats).item()
 
         # Entity score (backwards-compatible: exact float)
-        if isinstance(entity_score, torch.Tensor):
-            s_entity = entity_score.item()
+        if self.use_entity_signal:
+            if isinstance(entity_score, torch.Tensor):
+                s_entity = entity_score.item()
+            else:
+                s_entity = float(entity_score)
         else:
-            s_entity = float(entity_score)
+            s_entity = 0.0
 
         return float(
             self.alpha.item() * s_text
@@ -270,6 +285,15 @@ class JointScorer(nn.Module):
         d_e = doc_entity_embed.unsqueeze(0).to(device)
 
         cs_feats = self.build_constraint_features([constraint_result], device)
+
+        if not self.use_entity_signal:
+            return self.score_single(
+                query_text_embed=query_text_embed,
+                doc_text_embed=doc_text_embed,
+                kg_embed=kg_embed,
+                entity_score=0.0,
+                constraint_result=constraint_result,
+            )
 
         score_tensor = self.forward(q_t, d_t, kg, q_e, d_e, cs_feats)
         return score_tensor.item()

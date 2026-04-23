@@ -61,6 +61,7 @@ def train_gsr_cacl(
     log_every: int = 100,
     contr_version: ConstraintScoringVersion = "v1",
     rel_tol: float = 1e-4,
+    use_entity_signal: bool = True,
 ) -> list[TrainingState]:
     """
     Full GSR + CACL joint training loop with end-to-end gradient flow.
@@ -119,7 +120,14 @@ def train_gsr_cacl(
                 pos_cs = compute_constraint_score(pos_kg, version=contr_version, relative_tolerance=rel_tol)
                 pos_cs_feats = scorer.build_constraint_features([pos_cs], device)
 
-                pos_score = scorer(q_emb, pos_d_emb, pos_kg_embed, q_meta, q_meta, pos_cs_feats)
+                pos_score = scorer(
+                    q_emb,
+                    pos_d_emb,
+                    pos_kg_embed,
+                    q_meta if use_entity_signal else None,
+                    q_meta if use_entity_signal else None,
+                    pos_cs_feats,
+                )
                 pos_scores_list.append(pos_score.squeeze(0))
 
                 # Generate CHAP negative
@@ -135,7 +143,14 @@ def train_gsr_cacl(
                     neg_cs = compute_constraint_score(neg_kg, version=contr_version, relative_tolerance=rel_tol)
                     neg_cs_feats = scorer.build_constraint_features([neg_cs], device)
 
-                    neg_score = scorer(q_emb, neg_d_emb, neg_kg_embed, q_meta, q_meta, neg_cs_feats)
+                    neg_score = scorer(
+                        q_emb,
+                        neg_d_emb,
+                        neg_kg_embed,
+                        q_meta if use_entity_signal else None,
+                        q_meta if use_entity_signal else None,
+                        neg_cs_feats,
+                    )
                     neg_scores_list.append(neg_score.squeeze(0))
                     violates_list.append(1.0 if neg.is_violated else 0.0)
 

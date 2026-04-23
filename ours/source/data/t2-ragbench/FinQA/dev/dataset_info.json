@@ -1,0 +1,138 @@
+{
+  "builder_name": "json",
+  "citation": "",
+  "config_name": "FinQA",
+  "dataset_name": "t2-ragbench",
+  "dataset_size": 78761394,
+  "description": "",
+  "download_checksums": {
+    "hf://datasets/G4KMU/t2-ragbench@adf7fe1541ac37351ce1142544d8e3b43010ed92/data/FinQA/train/metadata.jsonl": {
+      "num_bytes": 61875159,
+      "checksum": null
+    },
+    "hf://datasets/G4KMU/t2-ragbench@adf7fe1541ac37351ce1142544d8e3b43010ed92/data/FinQA/dev/metadata.jsonl": {
+      "num_bytes": 8604079,
+      "checksum": null
+    },
+    "hf://datasets/G4KMU/t2-ragbench@adf7fe1541ac37351ce1142544d8e3b43010ed92/data/FinQA/test/metadata.jsonl": {
+      "num_bytes": 11107037,
+      "checksum": null
+    }
+  },
+  "download_size": 81586275,
+  "features": {
+    "id": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "context_id": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "split": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "question": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "program_answer": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "original_answer": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "context": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "table": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "pre_text": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "post_text": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "file_name": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "company_name": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "company_symbol": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "report_year": {
+      "dtype": "int64",
+      "_type": "Value"
+    },
+    "page_number": {
+      "dtype": "int64",
+      "_type": "Value"
+    },
+    "company_sector": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "company_industry": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "company_headquarters": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "company_date_added": {
+      "dtype": "timestamp[s]",
+      "_type": "Value"
+    },
+    "company_cik": {
+      "dtype": "int64",
+      "_type": "Value"
+    },
+    "company_founded": {
+      "dtype": "string",
+      "_type": "Value"
+    }
+  },
+  "homepage": "",
+  "license": "",
+  "size_in_bytes": 160347669,
+  "splits": {
+    "train": {
+      "name": "train",
+      "num_bytes": 59744065,
+      "num_examples": 6251,
+      "dataset_name": "t2-ragbench"
+    },
+    "dev": {
+      "name": "dev",
+      "num_bytes": 8303106,
+      "num_examples": 883,
+      "dataset_name": "t2-ragbench"
+    },
+    "test": {
+      "name": "test",
+      "num_bytes": 10714223,
+      "num_examples": 1147,
+      "dataset_name": "t2-ragbench"
+    }
+  },
+  "version": {
+    "version_str": "0.0.0",
+    "major": 0,
+    "minor": 0,
+    "patch": 0
+  }
+}

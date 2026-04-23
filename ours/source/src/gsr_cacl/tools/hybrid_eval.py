@@ -99,6 +99,7 @@ def run(args: argparse.Namespace) -> None:
         contr1=args.contr1,
         contr_version=args.contr2,
         rel_tol=args.rel_tol,
+        use_entity_signal=not args.disable_entity_signal,
     )
 
     # Phase 1: run baseline GSR joint scoring and save per-query candidates
@@ -139,7 +140,18 @@ def run(args: argparse.Namespace) -> None:
 
             # entity embedding path if available
             q_entity_emb = gsr._encode_query_entity(qmeta)
-            if q_entity_emb is not None and getattr(gsr, "doc_entity_embeds", None) is not None:
+            if not gsr.use_entity_signal:
+                with torch.no_grad():
+                    final_score = float(
+                        gsr.scorer.score_single(
+                            query_text_embed=torch.tensor(q_vec, dtype=torch.float32, device=gsr.device),
+                            doc_text_embed=doc_tensor,
+                            kg_embed=kg_embed,
+                            entity_score=0.0,
+                            constraint_result=cs_result,
+                        )
+                    )
+            elif q_entity_emb is not None and getattr(gsr, "doc_entity_embeds", None) is not None:
                 doc_entity_emb = gsr.doc_entity_embeds[idx].to(gsr.device)
                 with torch.no_grad():
                     final_score = float(
@@ -271,6 +283,8 @@ def cli():
     p.add_argument("--contr1", type=str, default="v1")
     p.add_argument("--contr2", type=str, default="v1")
     p.add_argument("--rel-tol", type=float, default=1e-3)
+    p.add_argument("--disable-entity-signal", action="store_true",
+                   help="Disable entity embeddings and entity score fusion; use text + KG only.")
     args = p.parse_args()
     run(args)
 
