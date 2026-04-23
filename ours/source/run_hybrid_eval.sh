@@ -20,8 +20,8 @@ if [ "$RUN_TRAIN" -eq 1 ]; then
     --dataset tatqa \
     --stage all \
     --preset t4 \
-    --epochs 10 \
-    --lora-r 32 \
+    --epochs 5 \
+    --lora-r 16 \
     --lora-alpha 64 \
     --batch-size 4 \
     --gradient-checkpointing \
