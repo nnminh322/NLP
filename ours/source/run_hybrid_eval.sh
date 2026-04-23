@@ -15,7 +15,7 @@ if [ "$DISABLE_ENTITY_SIGNAL" -eq 1 ]; then
   ENTITY_SIGNAL_ARGS+=(--disable-entity-signal)
 fi
 if [ "$RUN_TRAIN" -eq 1 ]; then
-  echo "Running training: LoRA r=32, epochs=10, batch_size=4"
+  echo "Running training: LoRA r=16, epochs=5, batch_size=8"
   python -m gsr_cacl.train \
     --dataset tatqa \
     --stage all \
