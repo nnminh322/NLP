@@ -87,7 +87,7 @@ Từ hai phân tích lý thuyết nêu trên, chúng tôi rút ra một kết lu
 
 \begin{figure}[H]
     \centering
-    \includesvg[width=\textwidth]{architecture/fig1_framework.svg}
+    \includesvg[inkscapelatex=false, width=\textwidth]{architecture/fig1_framework.svg}
     \caption{\textbf{Kiến trúc tổng quát của hệ thống GSR-CACL.} Một truy vấn $Q$ và tài liệu $D$ (văn bản + siêu dữ liệu + bảng) được mã hóa qua Shared Backbone. \textbf{Tín hiệu Văn bản} (xanh lam) được tính cosine chuẩn. \textbf{Tín hiệu Thực thể} (cam) tách riêng các trường công ty/năm/ngành, nhúng qua Backbone rồi tổng hợp lại bằng MLP để có vector thực thể $\mathbf{e}_Q, \mathbf{e}_D$. \textbf{Tín hiệu Cấu trúc} (xanh lá) trích xuất bảng thành KG và truyền tin qua Edge-Aware GAT để chấm điểm Constraint Score (CS). Kỹ thuật CHAP sẽ cố tình phá vỡ các đẳng thức (perturb $\omega$) để tạo mẫu âm khó. Cuối cùng, \textbf{Joint Scorer} hợp nhất 3 điểm số với trọng số học được.}
     \label{fig:framework}
 \end{figure}
