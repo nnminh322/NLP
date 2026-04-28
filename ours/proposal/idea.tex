@@ -13,6 +13,7 @@
 \usepackage{hyperref}
 \usepackage{caption}
 \usepackage{subcaption}
+\usepackage{svg}
 
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{6pt}
@@ -83,6 +84,13 @@ Từ hai phân tích lý thuyết nêu trên, chúng tôi rút ra một kết lu
 \end{enumerate}
 
 \section{Phương pháp Đề xuất: GSR và CACL}
+
+\begin{figure}[H]
+    \centering
+    \includesvg[width=\textwidth]{architecture/fig1_framework.svg}
+    \caption{\textbf{Kiến trúc tổng quát của hệ thống GSR-CACL.} Một truy vấn $Q$ và tài liệu $D$ (văn bản + siêu dữ liệu + bảng) được mã hóa qua Shared Backbone. \textbf{Tín hiệu Văn bản} (xanh lam) được tính cosine chuẩn. \textbf{Tín hiệu Thực thể} (cam) tách riêng các trường công ty/năm/ngành, nhúng qua Backbone rồi tổng hợp lại bằng MLP để có vector thực thể $\mathbf{e}_Q, \mathbf{e}_D$. \textbf{Tín hiệu Cấu trúc} (xanh lá) trích xuất bảng thành KG và truyền tin qua Edge-Aware GAT để chấm điểm Constraint Score (CS). Kỹ thuật CHAP sẽ cố tình phá vỡ các đẳng thức (perturb $\omega$) để tạo mẫu âm khó. Cuối cùng, \textbf{Joint Scorer} hợp nhất 3 điểm số với trọng số học được.}
+    \label{fig:framework}
+\end{figure}
 
 \subsection{Định nghĩa Bài toán (Problem Formulation)}
 Cho một tập ngữ liệu (corpus) $\mathcal{C} = \{C_1, \ldots, C_N\}$. Mỗi tài liệu $C_i$ được biểu diễn dưới dạng một bộ ba $C_i = (t_i, T_i, m_i)$, trong đó bao gồm văn bản tự sự $t_i$, bảng định dạng markdown $T_i$, và các thông tin siêu dữ liệu $m_i = (\text{company}_i, \text{year}_i, \text{sector}_i)$. Với một câu hỏi đầu vào $Q$, bài toán đặt ra là cần xây dựng một mô hình $f_\theta(Q, \mathcal{C})$ có khả năng đánh giá và truy xuất ra danh sách top-$K$ tài liệu liên quan nhất, nhằm tối ưu hóa các chỉ số đánh giá tiêu chuẩn như MRR và Recall.

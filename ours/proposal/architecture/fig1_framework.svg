@@ -1,0 +1,375 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 450" style="width:100%;display:block;">
+<!--
+  Mathematically accurate architecture — based on source code analysis.
+
+  TEXT SIGNAL:
+    raw text → tokenizer → BGE backbone → [CLS] → LayerNorm → L2 normalize → q_text / d_text
+
+  ENTITY SIGNAL:
+    company → BGE → [CLS] ─┐
+    year    → BGE → [CLS] ─┤ concat → Linear(3d, d) → ReLU → Dropout → Linear(d, d_e) → LayerNorm → L2 → e_Q / e_D
+
+  JOINT SCORER:
+    s_text    = cos(q, d) × (0.5 + 0.5·σ(gate(q))) + 0.2·MLP([d_text ⊕ d_KG])
+    s_entity  = cos(e_Q, e_D)
+    s_struct  = MLP_cs([raw_cs, violated_ratio, edge_norm])
+    s(Q,D)    = α·s_text + β·s_entity + γ·s_struct
+-->
+
+<defs>
+  <marker id="a" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
+    <path d="M0,0 L0,5 L7,2.5z" fill="#888"/></marker>
+  <marker id="ab" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
+    <path d="M0,0 L0,5 L7,2.5z" fill="#1a4a8a"/></marker>
+  <marker id="ao" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
+    <path d="M0,0 L0,5 L7,2.5z" fill="#7a3500"/></marker>
+  <marker id="ag" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
+    <path d="M0,0 L0,5 L7,2.5z" fill="#1a5c3e"/></marker>
+  <marker id="av" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
+    <path d="M0,0 L0,5 L7,2.5z" fill="#4a2880"/></marker>
+  <marker id="ar" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
+    <path d="M0,0 L0,5 L7,2.5z" fill="#7a2520"/></marker>
+</defs>
+
+
+<!-- ══════════════════════════════════════════════════
+     INPUTS
+══════════════════════════════════════════════════ -->
+
+<!-- Query Q -->
+<rect x="4" y="10" width="94" height="52" rx="5" fill="#e8eff9" stroke="#3068b0" stroke-width="1.2"/>
+<text x="51" y="28" text-anchor="middle" font-size="9.5" font-weight="bold" fill="#0d2850">Query Q</text>
+<text x="51" y="41" text-anchor="middle" font-size="6.5" fill="#0d2850">text: "What is…"</text>
+<text x="51" y="53" text-anchor="middle" font-size="6.5" fill="#5a2800">meta: Apple·2023·Tech</text>
+
+<!-- Document D -->
+<rect x="4" y="76" width="94" height="100" rx="5" fill="#e8eff9" stroke="#3068b0" stroke-width="1.2"/>
+<text x="51" y="93" text-anchor="middle" font-size="9.5" font-weight="bold" fill="#0d2850">Document D</text>
+<text x="51" y="106" text-anchor="middle" font-size="6.5" fill="#0d2850">text: "In FY 2023…"</text>
+<text x="51" y="118" text-anchor="middle" font-size="6.5" fill="#5a2800">meta: Apple·2023·Tech</text>
+
+<!-- Table T -->
+<rect x="10" y="126" width="82" height="42" rx="4" fill="#dff0e8" stroke="#267a5e" stroke-width=".9"/>
+<text x="51" y="140" text-anchor="middle" font-size="7" font-weight="bold" fill="#1a5040">Table T</text>
+<rect x="15" y="144" width="72" height="20" rx="2" fill="white" stroke="#bbb" stroke-width=".4"/>
+<line x1="15" y1="153" x2="87" y2="153" stroke="#ddd" stroke-width=".4"/>
+<line x1="50" y1="144" x2="50" y2="164" stroke="#ddd" stroke-width=".4"/>
+<text x="32" y="152" font-size="5" fill="#444" text-anchor="middle">Revenue</text>
+<text x="68" y="152" font-size="5" fill="#444" text-anchor="middle">COGS</text>
+<text x="32" y="162" font-size="5" fill="#222" text-anchor="middle">100M</text>
+<text x="68" y="162" font-size="5" fill="#222" text-anchor="middle">60M</text>
+
+
+<!-- ══════════════════════════════════════════════════
+     BACKBONE  — ONE shared f_θ
+══════════════════════════════════════════════════ -->
+
+<rect x="116" y="10" width="80" height="120" rx="6" fill="white" stroke="#444" stroke-width="1.4"/>
+<text x="156" y="40" text-anchor="middle" font-size="10.5" font-weight="bold" fill="#111">Backbone</text>
+<text x="156" y="56" text-anchor="middle" font-size="8" fill="#222" font-style="italic">f_θ</text>
+<line x1="126" y1="64" x2="186" y2="64" stroke="#e0e0e0" stroke-width=".6"/>
+<text x="156" y="80" text-anchor="middle" font-size="6.5" fill="#555">BGE / E5 /</text>
+<text x="156" y="91" text-anchor="middle" font-size="6.5" fill="#555">LLM2Vec</text>
+<text x="156" y="106" text-anchor="middle" font-size="6" fill="#999">(+ LoRA)</text>
+<text x="156" y="122" text-anchor="middle" font-size="5.5" fill="#aaa">shared θ</text>
+
+<!-- Input → Backbone -->
+<line x1="98" y1="30" x2="114" y2="32" stroke="#1a4a8a" stroke-width="1.1" marker-end="url(#ab)"/>
+<text x="106" y="26" font-size="5.5" font-weight="bold" fill="#1a4a8a" text-anchor="middle">Q</text>
+
+<line x1="98" y1="93" x2="114" y2="50" stroke="#1a4a8a" stroke-width="1.1" marker-end="url(#ab)"/>
+<text x="100" y="78" font-size="5.5" font-weight="bold" fill="#1a4a8a">D</text>
+
+<line x1="98" y1="48" x2="114" y2="78" stroke="#7a3500" stroke-width="1" marker-end="url(#ao)"/>
+<text x="100" y="60" font-size="5" fill="#7a3500">Q_m</text>
+
+<line x1="98" y1="114" x2="114" y2="98" stroke="#7a3500" stroke-width="1" marker-end="url(#ao)"/>
+<text x="100" y="112" font-size="5" fill="#7a3500">D_m</text>
+
+<!-- Table → Structural -->
+<line x1="92" y1="168" x2="132" y2="214" stroke="#1a5c3e" stroke-width="1.1" marker-end="url(#ag)"/>
+<text x="106" y="186" font-size="5.5" font-weight="bold" fill="#1a5040">T</text>
+
+
+<!-- ══════════════════════════════════════════════════
+     TEXT SIGNAL  (blue)
+     Math: text → tokenizer → BGE → [CLS] → LayerNorm → L2 → q_text / d_text
+══════════════════════════════════════════════════ -->
+
+<rect x="214" y="6" width="290" height="72" rx="7" fill="#e0e9f7" stroke="#3068b0" stroke-width="1.2"/>
+<text x="232" y="22" font-size="8.5" font-weight="bold" fill="#0d2850">Text Signal</text>
+
+<!-- backbone → text lane -->
+<line x1="196" y1="38" x2="224" y2="38" stroke="#1a4a8a" stroke-width="1.2" marker-end="url(#ab)"/>
+
+<!-- [CLS] -->
+<rect x="226" y="24" width="52" height="36" rx="4" fill="white" stroke="#3068b0" stroke-width=".9"/>
+<text x="252" y="40" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#0d2850">[CLS]</text>
+<text x="252" y="52" text-anchor="middle" font-size="6" fill="#555">pool</text>
+
+<line x1="278" y1="42" x2="296" y2="42" stroke="#3068b0" stroke-width="1" marker-end="url(#ab)"/>
+
+<!-- LayerNorm -->
+<rect x="298" y="24" width="50" height="36" rx="4" fill="white" stroke="#3068b0" stroke-width=".9"/>
+<text x="323" y="40" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#0d2850">LN</text>
+<text x="323" y="52" text-anchor="middle" font-size="6" fill="#555">LayerNorm</text>
+
+<line x1="348" y1="34" x2="370" y2="34" stroke="#3068b0" stroke-width="1" marker-end="url(#ab)"/>
+<line x1="348" y1="50" x2="370" y2="50" stroke="#3068b0" stroke-width="1" marker-end="url(#ab)"/>
+
+<!-- q_text, d_text -->
+<rect x="372" y="22" width="56" height="20" rx="4" fill="#1a4a8a"/>
+<text x="400" y="36" text-anchor="middle" font-size="8" font-weight="bold" fill="white">q_text</text>
+<rect x="372" y="46" width="56" height="20" rx="4" fill="#4a7cc0"/>
+<text x="400" y="60" text-anchor="middle" font-size="8" font-weight="bold" fill="white">d_text</text>
+
+<text x="440" y="36" font-size="5.5" fill="#0d2850">∈ ℝ^d</text>
+<text x="440" y="60" font-size="5.5" fill="#0d2850">∈ ℝ^d</text>
+
+
+<!-- ══════════════════════════════════════════════════
+     ENTITY SIGNAL  (orange)
+     Math: company→BGE→[CLS] ⊕ year→BGE→[CLS] ⊕ sector→BGE→[CLS]
+           → concat → Linear(3d,d) → ReLU → Drop → Linear(d,d_e) → LN → L2 → e_Q / e_D
+══════════════════════════════════════════════════ -->
+
+<rect x="214" y="92" width="290" height="62" rx="7" fill="#faebd0" stroke="#b06820" stroke-width="1.2"/>
+<text x="232" y="108" font-size="8.5" font-weight="bold" fill="#5a2800">Entity Signal</text>
+
+<!-- backbone → entity lane -->
+<line x1="196" y1="98" x2="224" y2="114" stroke="#7a3500" stroke-width="1.2" marker-end="url(#ao)"/>
+
+<!-- Three BGE calls -->
+<rect x="226" y="104" width="30" height="26" rx="4" fill="white" stroke="#b06820" stroke-width=".8"/>
+<text x="241" y="116" text-anchor="middle" font-size="6" font-weight="bold" fill="#5a2800">BGE</text>
+<text x="241" y="126" text-anchor="middle" font-size="5" fill="#888">co.</text>
+
+<rect x="260" y="104" width="24" height="26" rx="4" fill="white" stroke="#b06820" stroke-width=".8"/>
+<text x="272" y="116" text-anchor="middle" font-size="6" font-weight="bold" fill="#5a2800">BGE</text>
+<text x="272" y="126" text-anchor="middle" font-size="5" fill="#888">yr.</text>
+
+<rect x="288" y="104" width="28" height="26" rx="4" fill="white" stroke="#b06820" stroke-width=".8"/>
+<text x="302" y="116" text-anchor="middle" font-size="6" font-weight="bold" fill="#5a2800">BGE</text>
+<text x="302" y="126" text-anchor="middle" font-size="5" fill="#888">sec.</text>
+
+<!-- ⊕ -->
+<rect x="320" y="104" width="22" height="26" rx="4" fill="white" stroke="#b06820" stroke-width=".8"/>
+<text x="331" y="120" text-anchor="middle" font-size="10" fill="#5a2800">⊕</text>
+
+<!-- MLP: concat → Linear(3d,d) → ReLU → Drop → Linear(d,d_e) -->
+<rect x="346" y="100" width="62" height="34" rx="4" fill="white" stroke="#b06820" stroke-width=".9"/>
+<text x="377" y="114" text-anchor="middle" font-size="7" font-weight="bold" fill="#5a2800">Linear</text>
+<text x="377" y="125" text-anchor="middle" font-size="6" fill="#555">→ReLU→Drop</text>
+<text x="377" y="134" text-anchor="middle" font-size="6" fill="#555">→Linear→LN</text>
+
+<!-- LN + L2 -->
+<rect x="412" y="100" width="30" height="34" rx="4" fill="white" stroke="#b06820" stroke-width=".8"/>
+<text x="427" y="114" text-anchor="middle" font-size="7" font-weight="bold" fill="#5a2800">LN</text>
+<text x="427" y="125" text-anchor="middle" font-size="6" fill="#555">L2</text>
+
+<!-- outputs -->
+<line x1="442" y1="110" x2="462" y2="110" stroke="#b06820" stroke-width="1" marker-end="url(#ao)"/>
+<line x1="442" y1="124" x2="462" y2="124" stroke="#b06820" stroke-width="1" marker-end="url(#ao)"/>
+
+<rect x="464" y="100" width="36" height="18" rx="4" fill="#7a3500"/>
+<text x="482" y="113" text-anchor="middle" font-size="7.5" font-weight="bold" fill="white">e_Q</text>
+<rect x="464" y="122" width="36" height="18" rx="4" fill="#b06820"/>
+<text x="482" y="135" text-anchor="middle" font-size="7.5" font-weight="bold" fill="white">e_D</text>
+
+<text x="512" y="113" font-size="5.5" fill="#5a2800">∈ ℝ^{d_e}</text>
+<text x="512" y="135" font-size="5.5" fill="#5a2800">∈ ℝ^{d_e}</text>
+
+<!-- ℒ_ent badge -->
+<rect x="464" y="80" width="24" height="16" rx="7" fill="#fce0dc" stroke="#7a2520" stroke-width=".8"/>
+<text x="476" y="91" text-anchor="middle" font-size="6.5" font-weight="bold" fill="#7a2520">ℒ_e</text>
+
+
+<!-- ══════════════════════════════════════════════════
+     STRUCTURAL SIGNAL  (teal)
+══════════════════════════════════════════════════ -->
+
+<rect x="116" y="168" width="374" height="142" rx="7" fill="#dff0e8" stroke="#267a5e" stroke-width="1.2"/>
+<text x="134" y="186" font-size="8.5" font-weight="bold" fill="#1a5040">Structural Signal</text>
+
+<!-- Template Matching -->
+<rect x="134" y="200" width="70" height="38" rx="5" fill="white" stroke="#267a5e" stroke-width="1"/>
+<text x="169" y="216" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#1a5040">Template</text>
+<text x="169" y="228" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#1a5040">Matching</text>
+<text x="169" y="237" text-anchor="middle" font-size="5.5" fill="#555">IFRS / GAAP</text>
+
+<line x1="204" y1="219" x2="224" y2="219" stroke="#1a5c3e" stroke-width="1" marker-end="url(#ag)"/>
+
+<!-- KG -->
+<rect x="226" y="198" width="62" height="48" rx="5" fill="white" stroke="#267a5e" stroke-width="1"/>
+<text x="257" y="214" text-anchor="middle" font-size="8.5" font-weight="bold" fill="#1a5040">KG</text>
+<circle cx="242" cy="230" r="4.5" fill="#267a5e" opacity=".5"/>
+<circle cx="262" cy="223" r="3.5" fill="#5aab8e" opacity=".5"/>
+<circle cx="262" cy="237" r="3.5" fill="#5aab8e" opacity=".5"/>
+<line x1="246" y1="229" x2="259" y2="224" stroke="#267a5e" stroke-width=".8"/>
+<line x1="246" y1="231" x2="259" y2="236" stroke="#267a5e" stroke-width=".8"/>
+<text x="273" y="226" font-size="5" fill="#1a5040">+1</text>
+<text x="273" y="240" font-size="5" fill="#1a5040">−1</text>
+
+<!-- KG → GAT (upper) -->
+<line x1="288" y1="210" x2="312" y2="210" stroke="#1a5c3e" stroke-width="1" marker-end="url(#ag)"/>
+
+<rect x="314" y="196" width="72" height="34" rx="5" fill="white" stroke="#267a5e" stroke-width="1"/>
+<text x="350" y="210" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#1a5040">Edge-Aware</text>
+<text x="350" y="223" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#1a5040">GAT</text>
+
+<line x1="386" y1="213" x2="412" y2="213" stroke="#1a5c3e" stroke-width="1" marker-end="url(#ag)"/>
+
+<rect x="414" y="203" width="52" height="20" rx="4" fill="#1a5c3e"/>
+<text x="440" y="217" text-anchor="middle" font-size="8" font-weight="bold" fill="white">d_KG</text>
+
+<!-- KG → Constraint Scoring (lower) -->
+<line x1="288" y1="234" x2="312" y2="260" stroke="#1a5c3e" stroke-width="1" marker-end="url(#ag)"/>
+
+<rect x="314" y="246" width="72" height="34" rx="5" fill="white" stroke="#267a5e" stroke-width="1"/>
+<text x="350" y="260" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#1a5040">Constraint</text>
+<text x="350" y="273" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#1a5040">Scoring</text>
+
+<line x1="386" y1="263" x2="412" y2="263" stroke="#1a5c3e" stroke-width="1" marker-end="url(#ag)"/>
+
+<rect x="414" y="253" width="52" height="20" rx="4" fill="#267a5e"/>
+<text x="440" y="267" text-anchor="middle" font-size="8" font-weight="bold" fill="white">CS</text>
+
+<!-- CHAP -->
+<rect x="134" y="256" width="78" height="42" rx="5" fill="#fce0dc" stroke="#7a2520" stroke-width=".9"/>
+<text x="173" y="272" text-anchor="middle" font-size="7.5" font-weight="bold" fill="#7a2520">CHAP</text>
+<text x="173" y="286" text-anchor="middle" font-size="6" fill="#7a2520">hard neg. C⁻</text>
+
+<line x1="249" y1="246" x2="214" y2="264" stroke="#7a2520" stroke-width=".9" stroke-dasharray="3,2" marker-end="url(#ar)"/>
+<text x="240" y="260" font-size="5" fill="#7a2520">perturb ω</text>
+
+
+<!-- ══════════════════════════════════════════════════
+     JOINT SCORER  — correct math from source code
+     s(Q,D) = α·s_text + β·s_entity + γ·s_struct
+     s_text  = cos(q,d) × (0.5+0.5·σ(gate(q))) + 0.2·MLP([d⊕d_KG])
+     s_entity = cos(e_Q, e_D)
+     s_struct = MLP_cs([raw_cs, viol_ratio, edge_norm])
+══════════════════════════════════════════════════ -->
+
+<rect x="530" y="6" width="180" height="298" rx="8" fill="#ede5f7" stroke="#5a3a90" stroke-width="1.5"/>
+<text x="620" y="26" text-anchor="middle" font-size="10.5" font-weight="bold" fill="#2a1060">Joint Scorer</text>
+
+<!-- s_text box -->
+<rect x="544" y="34" width="152" height="62" rx="5" fill="#e0e9f7" stroke="#3068b0" stroke-width="1"/>
+<text x="620" y="50" text-anchor="middle" font-size="8.5" font-weight="bold" fill="#0d2850">s_text</text>
+<text x="620" y="64" text-anchor="middle" font-size="6" fill="#222">cos(q_text, d_text) ×</text>
+<text x="620" y="76" text-anchor="middle" font-size="6" fill="#222">(0.5 + 0.5 · σ(gate(q)))</text>
+<text x="620" y="88" text-anchor="middle" font-size="6" fill="#555">+ 0.2 · MLP([d_text ⊕ d_KG])</text>
+
+<!-- s_entity box -->
+<rect x="544" y="108" width="152" height="38" rx="5" fill="#faebd0" stroke="#b06820" stroke-width="1"/>
+<text x="620" y="124" text-anchor="middle" font-size="8.5" font-weight="bold" fill="#5a2800">s_entity</text>
+<text x="620" y="138" text-anchor="middle" font-size="6" fill="#222">cos(e_Q, e_D)</text>
+
+<!-- s_struct box -->
+<rect x="544" y="158" width="152" height="38" rx="5" fill="#dff0e8" stroke="#267a5e" stroke-width="1"/>
+<text x="620" y="174" text-anchor="middle" font-size="8.5" font-weight="bold" fill="#1a5040">s_struct</text>
+<text x="620" y="188" text-anchor="middle" font-size="6" fill="#222">MLP([raw_cs, viol_ratio, edge_norm])</text>
+
+<!-- Weighted sum: α·s_text + β·s_entity + γ·s_struct -->
+<rect x="554" y="208" width="132" height="28" rx="5" fill="white" stroke="#5a3a90" stroke-width="1.1"/>
+<text x="620" y="228" text-anchor="middle" font-size="9.5" font-weight="bold" fill="#4a2880">Σ</text>
+<text x="610" y="222" font-size="6" fill="#4a2880">α·</text>
+<text x="634" y="222" font-size="6" fill="#4a2880">+ β· + γ·</text>
+
+<!-- arrows down to sum -->
+<line x1="590" y1="96" x2="590" y2="208" stroke="#5a3a90" stroke-width=".6" stroke-dasharray="2,2"/>
+<line x1="620" y1="146" x2="620" y2="208" stroke="#5a3a90" stroke-width=".6" stroke-dasharray="2,2"/>
+<line x1="650" y1="196" x2="650" y2="208" stroke="#5a3a90" stroke-width=".6" stroke-dasharray="2,2"/>
+
+<!-- sum → score -->
+<line x1="620" y1="236" x2="620" y2="248" stroke="#5a3a90" stroke-width="1.2" marker-end="url(#av)"/>
+
+<!-- final s(Q,D) -->
+<rect x="556" y="248" width="128" height="24" rx="6" fill="#5a3a90"/>
+<text x="620" y="265" text-anchor="middle" font-size="9.5" font-weight="bold" fill="white">s(Q, D)</text>
+
+<!-- α,β,γ note -->
+<text x="534" y="286" font-size="5.5" fill="#4a2880">α,β,γ = softplus(θ)</text>
+
+
+<!-- ══════════════════════════════════════════════════
+     ARROWS: outputs → scorer
+     q_text/d_text → scorer left, q_text fed to gate too
+     e_Q/e_D → scorer
+     d_KG → scorer
+     CS → scorer
+══════════════════════════════════════════════════ -->
+
+<!-- q_text → s_text box -->
+<line x1="428" y1="32" x2="542" y2="46" stroke="#1a4a8a" stroke-width="1.1" marker-end="url(#ab)"/>
+<text x="485" y="30" font-size="6" font-weight="bold" fill="#0d2850">q_text</text>
+
+<!-- d_text → s_text box -->
+<line x1="428" y1="56" x2="542" y2="70" stroke="#4a7cc0" stroke-width="1.1" marker-end="url(#ab)"/>
+<text x="485" y="55" font-size="6" font-weight="bold" fill="#0d2850">d_text</text>
+
+<!-- e_Q → s_entity box -->
+<line x1="500" y1="109" x2="542" y2="118" stroke="#7a3500" stroke-width="1.1" marker-end="url(#ao)"/>
+<text x="521" y="105" font-size="6" font-weight="bold" fill="#5a2800">e_Q</text>
+
+<!-- e_D → s_entity box -->
+<line x1="500" y1="131" x2="542" y2="138" stroke="#b06820" stroke-width="1.1" marker-end="url(#ao)"/>
+<text x="521" y="133" font-size="6" font-weight="bold" fill="#5a2800">e_D</text>
+
+<!-- d_KG → s_text box -->
+<line x1="466" y1="213" x2="542" y2="82" stroke="#1a5c3e" stroke-width="1.1" marker-end="url(#ag)"/>
+<text x="500" y="150" font-size="6" font-weight="bold" fill="#1a5040" transform="rotate(-50 500 150)">d_KG</text>
+
+<!-- CS → s_struct box -->
+<line x1="466" y1="263" x2="542" y2="177" stroke="#1a5c3e" stroke-width="1.1" marker-end="url(#ag)"/>
+<text x="500" y="226" font-size="6" font-weight="bold" fill="#1a5040" transform="rotate(-45 500 226)">CS</text>
+
+
+<!-- ══════════════════════════════════════════════════
+     OUTPUT
+══════════════════════════════════════════════════ -->
+<line x1="710" y1="152" x2="744" y2="152" stroke="#888" stroke-width="1.5" marker-end="url(#a)"/>
+
+<rect x="748" y="118" width="120" height="68" rx="8" fill="#f0f0f0" stroke="#888" stroke-width="1.2"/>
+<text x="808" y="142" text-anchor="middle" font-size="10" font-weight="bold" fill="#222">Ranked</text>
+<text x="808" y="158" text-anchor="middle" font-size="10" font-weight="bold" fill="#222">Documents</text>
+<text x="808" y="174" text-anchor="middle" font-size="7" fill="#444" font-style="italic">Top-K → LLM</text>
+
+
+<!-- ══════════════════════════════════════════════════
+     TRAINING  (bottom)
+══════════════════════════════════════════════════ -->
+
+<line x1="173" y1="298" x2="173" y2="368" stroke="#7a2520" stroke-width=".9" stroke-dasharray="3,2"/>
+<line x1="173" y1="368" x2="528" y2="368" stroke="#7a2520" stroke-width=".9" stroke-dasharray="3,2" marker-end="url(#ar)"/>
+<text x="350" y="364" font-size="6" fill="#7a2520">C⁻ hard negatives → ℒ_triplet</text>
+
+<rect x="530" y="334" width="180" height="68" rx="6" fill="#fce0dc" stroke="#7a2520" stroke-width="1" stroke-dasharray="5,3"/>
+<text x="548" y="352" font-size="8.5" font-weight="bold" fill="#7a2520">Training (3-stage)</text>
+<text x="548" y="368" font-size="7.5" fill="#222">ℒ = ℒ_triplet</text>
+<text x="548" y="382" font-size="7.5" fill="#222">   + λ_e · ℒ_ent</text>
+<text x="548" y="396" font-size="7.5" fill="#222">   + λ_c · ℒ_con</text>
+
+<line x1="620" y1="334" x2="620" y2="290" stroke="#7a2520" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#ar)"/>
+
+
+<!-- LEGEND -->
+<g transform="translate(4,430)">
+  <line x1="0" y1="0" x2="16" y2="0" stroke="#888" stroke-width="1.3"/>
+  <text x="20" y="3.5" font-size="6.5" fill="#333">forward</text>
+  <line x1="64" y1="0" x2="80" y2="0" stroke="#7a2520" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="84" y="3.5" font-size="6.5" fill="#333">train only</text>
+  <rect x="130" y="-4.5" width="10" height="10" rx="2" fill="#e0e9f7" stroke="#3068b0" stroke-width=".6"/>
+  <text x="144" y="3.5" font-size="6.5" fill="#333">text</text>
+  <rect x="166" y="-4.5" width="10" height="10" rx="2" fill="#faebd0" stroke="#b06820" stroke-width=".6"/>
+  <text x="180" y="3.5" font-size="6.5" fill="#333">entity</text>
+  <rect x="210" y="-4.5" width="10" height="10" rx="2" fill="#dff0e8" stroke="#267a5e" stroke-width=".6"/>
+  <text x="224" y="3.5" font-size="6.5" fill="#333">structure</text>
+  <rect x="266" y="-4.5" width="10" height="10" rx="2" fill="#ede5f7" stroke="#5a3a90" stroke-width=".6"/>
+  <text x="280" y="3.5" font-size="6.5" fill="#333">scorer</text>
+  <rect x="314" y="-4.5" width="10" height="10" rx="2" fill="white" stroke="#444" stroke-width=".8"/>
+  <text x="328" y="3.5" font-size="6.5" fill="#333">backbone</text>
+</g>
+
+</svg>
