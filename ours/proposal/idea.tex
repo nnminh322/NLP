@@ -30,107 +30,184 @@
 
 \vspace{-1.5cm}
 \begin{abstract}
-Truy xuất ngữ cảnh chính xác từ các báo cáo tài chính hỗn hợp (văn bản và bảng biểu) là bước then chốt trong hệ thống Retrieval-Augmented Generation (RAG) lĩnh vực tài chính. Các phương pháp dense retrieval hiện tại thường thất bại trên miền dữ liệu này do xem các bảng biểu như văn bản phẳng (flat text), qua đó phá hủy đi các ràng buộc toán học nội tại và bỏ qua tính phân biệt của siêu dữ liệu thực thể. Trong bài báo này, chúng tôi đề xuất \textbf{GSR} (Graph-Structured Retrieval) -- một khung truy xuất biểu diễn bảng tài chính dưới dạng Đồ thị Tri thức với các cạnh là các ràng buộc kế toán (Constraint KG). Đồ thị này được xử lý thông qua mạng GAT nhận biết cạnh (Edge-Aware GAT) và kết hợp với điểm số vi phạm ràng buộc (Constraint Score) để đánh giá tài liệu. Để huấn luyện hệ thống, chúng tôi phát triển \textbf{CACL} (Constraint-Aware Contrastive Learning) kết hợp kỹ thuật sinh mẫu âm khó \textbf{CHAP} dựa trên việc phá vỡ có chủ đích các đẳng thức kế toán. Thực nghiệm quy mô lớn trên benchmark $\mathrm{T}^2$-RAGBench (gồm FinQA, ConvFinQA, TAT-DQA) cho thấy phương pháp đề xuất vượt trội đáng kể (+13.1\% MRR@3 trên FinQA) so với các baselines mạnh nhất hiện nay mà không cần sử dụng LLM trong quá trình truy xuất.
+Truy xuất ngữ cảnh chính xác từ các báo cáo tài chính, vốn luôn tồn tại dưới dạng hỗn hợp giữa văn bản tự sự và bảng biểu, là một bước ngoặt then chốt quyết định hiệu năng của các hệ thống Retrieval-Augmented Generation (RAG) trong lĩnh vực tài chính. Khảo sát cho thấy các phương pháp truy xuất dày (dense retrieval) hiện hành thường gặp thất bại nghiêm trọng trên miền dữ liệu này. Nguyên nhân chính bắt nguồn từ việc chúng xử lý các bảng biểu giống như văn bản phẳng (flat text), qua đó vô tình phá hủy đi các ràng buộc toán học nội tại, đồng thời bỏ qua tính phân biệt cực kỳ quan trọng của siêu dữ liệu thực thể. Trong nghiên cứu này, chúng tôi đề xuất \textbf{GSR} (Graph-Structured Retrieval) -- một khung truy xuất biểu diễn bảng tài chính dưới dạng Đồ thị Tri thức. Các cạnh của đồ thị này biểu diễn trực tiếp các ràng buộc kế toán có hướng (Constraint KG). Đồ thị này sau đó được xử lý thông qua mạng GAT nhận biết cạnh (Edge-Aware GAT) và kết hợp với điểm số vi phạm ràng buộc (Constraint Score) để đánh giá tài liệu một cách toàn diện. Hơn thế nữa, nhằm mục đích tối ưu hóa quá trình huấn luyện, chúng tôi phát triển \textbf{CACL} (Constraint-Aware Contrastive Learning), kết hợp với kỹ thuật sinh mẫu âm khó mang tên \textbf{CHAP}. Kỹ thuật này hoạt động dựa trên nguyên lý phá vỡ có chủ đích các đẳng thức kế toán để tạo ra các mẫu âm khó mang tính thách thức cao. Thực nghiệm quy mô lớn trên benchmark $\mathrm{T}^2$-RAGBench (bao gồm FinQA, ConvFinQA, TAT-DQA) cho thấy phương pháp đề xuất vượt trội đáng kể (+13.1\% MRR@3 trên FinQA) so với các baselines mạnh nhất hiện nay, ngay cả khi không sử dụng bất kỳ Mô hình Ngôn ngữ Lớn (LLM) nào trong pha truy xuất.
 \end{abstract}
 
 \section{Giới thiệu (Introduction)}
 
-Việc truy xuất tự động các ngữ cảnh liên quan từ kho tài liệu báo cáo tài chính khổng lồ là bài toán cốt lõi định hình thành công của các hệ thống hỏi đáp (QA) và sinh văn bản tăng cường truy xuất (RAG) trong miền tài chính. Khác với các tài liệu văn bản thông thường (open-domain), tài liệu tài chính có tính đặc thù cao: chúng bao gồm văn bản tự sự (narratives), siêu dữ liệu thực thể (metadata như tên công ty, năm tài chính, lĩnh vực) và các bảng biểu định dạng đậm đặc con số (dense tables).
+Sự bùng nổ của các mô hình ngôn ngữ lớn đã thúc đẩy mạnh mẽ ứng dụng của các hệ thống hỏi đáp (QA) và sinh văn bản tăng cường truy xuất (RAG) vào nhiều lĩnh vực chuyên sâu. Trong lĩnh vực tài chính, cốt lõi để một hệ thống RAG hoạt động hiệu quả là khả năng truy xuất tự động và chính xác các ngữ cảnh từ kho báo cáo khổng lồ. Đặc thù của tài liệu tài chính khác hoàn toàn so với các tài liệu mở (open-domain) thông thường: chúng được cấu trúc rất chặt chẽ, bao gồm văn bản tự sự (narratives) giải thích tình hình kinh doanh, siêu dữ liệu thực thể (metadata như tên công ty, năm tài chính, lĩnh vực) và đặc biệt là các bảng biểu định dạng đậm đặc các con số (dense tables) tuân theo các chuẩn mực báo cáo IFRS hoặc GAAP.
 
-Mặc dù các mô hình truy xuất dày (dense retrieval) dựa trên kiến trúc bi-encoder như DPR hay BGE đã đạt được nhiều thành tựu vượt bậc, chúng vẫn bộc lộ những điểm yếu nghiêm trọng khi áp dụng trực tiếp vào tài liệu tài chính. Hiện tượng phổ biến nhất là sự "ảo giác trùng lặp từ vựng" (lexical overlap illusion) -- các báo cáo của cùng một công ty qua các năm thường có cấu trúc câu và từ vựng giống nhau đến mức mô hình không thể phân biệt được, dẫn đến việc truy xuất nhầm ngữ cảnh thực thể (Entity Conflation). Tệ hơn nữa, việc xử lý các bảng số liệu bằng cách "làm phẳng" (flattening) thành chuỗi văn bản đã vô tình phá hủy đi mối quan hệ cấu trúc cha-con và các nguyên tắc kế toán bất biến (ví dụ: Doanh thu - Giá vốn = Lợi nhuận gộp). Hậu quả là mô hình hoàn toàn mù mờ trước logic toán học, dễ dàng bị đánh lừa bởi các tài liệu chứa nhiều con số trùng khớp ngẫu nhiên.
+Mặc dù các mô hình truy xuất dày (dense retrieval) dựa trên kiến trúc bi-encoder (chẳng hạn như DPR hay BGE) đã đạt được hiệu năng ấn tượng trên các miền dữ liệu chung, chúng vẫn liên tục gặp giới hạn khi đối mặt với sự phức tạp của tài liệu tài chính. Vấn đề nghiêm trọng và phổ biến nhất được ghi nhận là hiện tượng "ảo giác trùng lặp từ vựng" (lexical overlap illusion). Cụ thể, các báo cáo tài chính của cùng một công ty qua nhiều năm thường sử dụng lại một lượng lớn cấu trúc câu và từ vựng. Sự lặp lại ngữ pháp này khiến cho các mô hình truy xuất tiêu chuẩn bị nhầm lẫn, dẫn đến việc gán điểm tương đồng cao cho các tài liệu sai thời điểm hoặc sai công ty, gây ra hiện tượng Nhầm lẫn Thực thể (Entity Conflation). Tệ hơn nữa, để xử lý các bảng số liệu, các mô hình này buộc phải "làm phẳng" (flattening) chúng thành chuỗi văn bản (ví dụ như chuỗi markdown). Hành động này vô hình trung phá hủy đi mối quan hệ phân cấp (cha-con) giữa các hàng, cột, cũng như làm bay hơi các nguyên tắc kế toán bất biến (như Doanh thu - Giá vốn = Lợi nhuận gộp). Hậu quả là mô hình hoàn toàn mất đi khả năng nhận thức logic toán học, dễ dàng bị đánh lừa bởi những tài liệu có chứa các con số trông có vẻ liên quan nhưng lại vi phạm cấu trúc tính toán.
 
-Để giải quyết triệt để vấn đề này, chúng tôi đề xuất \textbf{GSR} (Graph-Structured Retrieval). GSR vượt qua giới hạn của biểu diễn văn bản đơn thuần bằng cách bổ sung hai luồng thông tin sống còn: (1) Siêu dữ liệu thực thể được mô hình hóa rõ ràng thông qua học đối lập có giám sát (Supervised Contrastive Learning) để giải quyết nhầm lẫn thực thể; và (2) Các bảng tài chính được trích xuất thành các Đồ thị Tri thức Ràng buộc (Constraint Knowledge Graph), nơi mỗi ô dữ liệu là một node, và các cạnh biểu diễn logic IFRS/GAAP. Thông qua mạng Graph Attention Network nhận biết cạnh (Edge-Aware GAT), GSR có thể hiểu được tính hợp lệ của cấu trúc số liệu và lượng hóa chúng thành điểm số Constraint Score để sàng lọc tài liệu.
+Để khắc phục những giới hạn cốt lõi trên, nghiên cứu này đề xuất \textbf{GSR} (Graph-Structured Retrieval). Khác với các phương pháp trước đây, GSR mở rộng không gian biểu diễn bằng cách tích hợp hai luồng thông tin đặc thù của miền tài chính. Thứ nhất, siêu dữ liệu thực thể được mô hình hóa một cách tường minh thông qua học đối lập có giám sát (Supervised Contrastive Learning) nhằm nâng cao năng lực phân biệt thực thể. Thứ hai, thay vì làm phẳng bảng, GSR duy trì toàn vẹn cấu trúc bằng cách trích xuất chúng thành các Đồ thị Tri thức Ràng buộc (Constraint Knowledge Graph), trong đó mỗi ô dữ liệu là một node, và các cạnh biểu diễn các công thức kế toán. Cấu trúc đồ thị này được xử lý bằng mạng Graph Attention Network nhận biết cạnh (Edge-Aware GAT) chuyên biệt, giúp mô hình tự động kiểm tra tính hợp lệ của số liệu và tạo ra điểm số Constraint Score để sàng lọc tài liệu chính xác hơn.
 
-Ngoài ra, nhằm cung cấp tín hiệu huấn luyện chất lượng, chúng tôi đề xuất khung \textbf{CACL} (Constraint-Aware Contrastive Learning). Trái tim của CACL là \textbf{CHAP} -- một bộ lấy mẫu âm khó (hard negative sampler) dựa trên việc chủ động tạo ra các vi phạm kế toán vi mô (thay đổi giá trị, hoán đổi cấu trúc). Việc buộc mô hình phải phân biệt giữa tài liệu gốc và tài liệu vi phạm CHAP giúp hệ thống thực sự học được "ngữ nghĩa ràng buộc" thay vì chỉ học vẹt từ vựng.
+Thêm vào đó, để cung cấp môi trường học tập tối ưu cho mô hình, chúng tôi đề xuất \textbf{CACL} (Constraint-Aware Contrastive Learning). Vấn đề lớn trong học đối lập là thiếu hụt các mẫu âm chất lượng cao. CACL giải quyết điều này bằng \textbf{CHAP} -- một kỹ thuật sinh mẫu âm khó dựa trên việc cố tình tạo ra các vi phạm vi mô trong báo cáo tài chính (chẳng hạn như thay đổi giá trị một ô tính, hoặc hoán đổi công ty). Việc bị ép buộc phải phân biệt giữa tài liệu gốc và tài liệu vi phạm CHAP giúp hệ thống thực sự học được "ngữ nghĩa ràng buộc toán học" thay vì chỉ học vẹt các biểu diễn bề mặt.
 
-Tóm tắt các đóng góp chính của bài báo:
+Tóm tắt các đóng góp chính của nghiên cứu:
 \begin{itemize}[leftmargin=*]
-    \item Chúng tôi hệ thống hóa và phân tích rành mạch các nguyên nhân gây thất bại của dense retrieval trên tài liệu tài chính thông qua lăng kính của lý thuyết thông tin.
-    \item Đề xuất khung kiến trúc \textbf{GSR} tích hợp Edge-Aware GAT và Constraint Scoring, cho phép mô hình hóa trực tiếp các ràng buộc toán học vào không gian biểu diễn truy xuất.
-    \item Đề xuất cơ chế huấn luyện \textbf{CACL} với kỹ thuật sinh mẫu âm \textbf{CHAP}, giải quyết bài toán thiếu hụt mẫu âm chất lượng trong domain tài chính.
-    \item Đạt kết quả State-of-the-Art (SOTA) trên các tập dữ liệu FinQA, ConvFinQA, và TAT-DQA, vượt trội cả các phương pháp lai (Hybrid) hay dùng LLM hỗ trợ.
+    \item Chúng tôi đóng góp một khung phân tích lý thuyết sắc bén, sử dụng lý thuyết thông tin để hệ thống hóa nguyên nhân thất bại của dense retrieval trên tài liệu tài chính (Entity Conflation và Mathematical Flattening).
+    \item Đề xuất khung kiến trúc \textbf{GSR} tích hợp đồ thị Constraint KG, Edge-Aware GAT và Joint Scorer, lần đầu tiên cho phép nhúng trực tiếp các ràng buộc toán học vào không gian truy xuất.
+    \item Thiết kế phương pháp huấn luyện \textbf{CACL} với kỹ thuật sinh mẫu âm \textbf{CHAP}, mở ra hướng đi mới trong việc đào tạo mô hình bằng mẫu âm dựa trên vi phạm logic thay vì vi phạm ngữ nghĩa đơn thuần.
+    \item Đạt kết quả SOTA vững chắc trên các tập dữ liệu FinQA, ConvFinQA, và TAT-DQA, chứng minh ưu thế của mô hình cấu trúc so với các phương pháp lai hoặc các phương pháp dùng LLM khổng lồ.
 \end{itemize}
 
 \section{Công trình liên quan (Related Work)}
 
-\textbf{Truy xuất bảng trong tài liệu tài chính.} Việc truy xuất thông tin từ tài liệu đa phương thức (bảng và văn bản) đã thu hút nhiều sự chú ý. HELIOS~\cite{helios2025} sử dụng đồ thị hai phía (bipartite graph) để nối bảng và văn bản nhằm giải quyết các câu hỏi đa bước, tuy nhiên lại không mô hình hóa các ràng buộc kế toán nội tại của bảng. THYME~\cite{thyme2025} và THoRR~\cite{thorr2024} đề xuất các phương pháp ghép nối theo trường (field-aware) và truy xuất hai giai đoạn dựa trên header, nhưng vẫn chỉ dừng ở mức độ nối văn bản bề mặt, thiếu đi sự hiểu biết toàn cục về các quan hệ số học. Trái ngược với các phương pháp trên, GSR trích xuất trực tiếp logic kế toán thành đồ thị.
+\textbf{Truy xuất bảng trong tài liệu tài chính.} Gần đây, việc truy xuất từ các tài liệu hỗn hợp đa phương thức đã thu hút sự quan tâm lớn. HELIOS~\cite{helios2025} tiếp cận bằng cách sử dụng đồ thị hai phía (bipartite graph) để tạo mối liên kết giữa các bảng và các đoạn văn bản xung quanh, nhằm giải quyết các truy vấn đa bước. Dù vậy, phương pháp này bỏ ngỏ hoàn toàn các ràng buộc kế toán nằm bên trong chính các bảng. THYME~\cite{thyme2025} và THoRR~\cite{thorr2024} đề xuất các phương pháp ghép nối theo trường (field-aware) và truy xuất chia làm hai giai đoạn chủ yếu dựa trên thông tin header của bảng. Tuy nhiên, các kỹ thuật này vẫn chỉ xử lý thông tin ở cấp độ ghép nối bề mặt từ vựng, thiếu hụt đi một sự thấu hiểu toàn cục về sự ràng buộc của các con số. Trái ngược lại, hệ thống GSR của chúng tôi phân tích sâu hơn bằng cách trích xuất trực tiếp logic kế toán thành các đồ thị có hướng.
 
-\textbf{Học đối lập và Mẫu âm khó.} Hiệu năng của dense retrieval phụ thuộc lớn vào chất lượng của tập mẫu âm (negative samples). DPR~\cite{karpukhin2020dpr} thiết lập tiêu chuẩn với việc dùng BM25 để đào mẫu âm khó (hard negatives). Gần đây, ConFIT~\cite{confit2025} chứng minh lợi ích của việc tạo mẫu âm bằng cách nhiễu loạn ngữ nghĩa dựa trên từ điển Wikidata. Tuy nhiên, chưa có công trình nào trong lĩnh vực tài chính tận dụng chính các phương trình toán học nội tại của bảng để tạo ra mẫu âm tinh tế như phương pháp CHAP của chúng tôi.
+\textbf{Học đối lập và Khai thác Mẫu âm khó.} Hiệu năng của các mô hình dense retrieval phụ thuộc mang tính sống còn vào chất lượng của tập mẫu âm (negative samples). DPR~\cite{karpukhin2020dpr} thiết lập một tiêu chuẩn chuẩn mực bằng cách sử dụng BM25 để tìm ra các mẫu âm khó (hard negatives) mà mô hình vector dễ dự đoán sai. Trong những nghiên cứu gần đây, ConFIT~\cite{confit2025} đã chứng minh được lợi ích vượt trội của việc tạo mẫu âm nhân tạo thông qua việc nhiễu loạn ngữ nghĩa dựa trên các từ điển tri thức như Wikidata. Tuy nhiên, trong lĩnh vực tài chính chuyên biệt, chưa có nghiên cứu nào tận dụng chính các phương trình toán học nội tại của các báo cáo để tạo ra mẫu âm một cách tinh tế. Phương pháp CHAP lấp đầy khoảng trống này bằng việc biến đổi các công thức thành các mẫu âm khó mang tính đánh lừa cao.
 
 \section{Nền tảng Lý thuyết và Động lực Nghiên cứu}
 
-Trong miền tài chính, tài liệu thường là sự kết hợp đậm đặc giữa văn bản (text) và bảng biểu (tables). Việc áp dụng trực tiếp các phương pháp truy xuất tiêu chuẩn bộc lộ hai khiếm khuyết lý thuyết cốt lõi, tạo thành động lực chính cho nghiên cứu này.
+Tài liệu trong miền tài chính mang một sự pha trộn dày đặc giữa văn bản (text) và bảng biểu (tables). Việc áp dụng một cách khiên cưỡng các phương pháp truy xuất tiêu chuẩn đã làm bộc lộ hai khiếm khuyết cốt lõi về mặt lý thuyết, từ đó định hình nên động lực cho nghiên cứu này.
 
 \subsection{Hiện tượng Nhầm lẫn Thực thể (Entity Conflation) do Trùng lặp Từ vựng}
-Đặc trưng của văn bản báo cáo tài chính (được quy định bởi các chuẩn mực như IFRS, GAAP) là tính khuôn mẫu cực kỳ cao (Formulaic Encoding~\cite{halliday1994}). Các báo cáo của cùng một công ty qua các năm, hoặc của các công ty khác nhau trong cùng ngành, thường sử dụng lại đến 80-90\% cấu trúc câu và từ vựng. Khi biểu diễn dưới dạng vector, sự tương đồng từ vựng này che lấp đi sự khác biệt quan trọng về thực thể (metadata như năm, tên công ty). Các mô hình bi-encoder truyền thống dễ dàng bị hiện tượng "Ảo giác trùng lặp từ vựng" (Lexical Overlap Illusion), đánh giá cao các tài liệu sai thời điểm chỉ vì chúng lặp lại cấu trúc ngữ pháp.
+Theo góc nhìn ngôn ngữ học chức năng, đặc trưng của văn bản báo cáo tài chính -- vốn chịu sự chi phối nghiêm ngặt của các chuẩn mực như IFRS hay GAAP -- là tính khuôn mẫu cực kỳ cao (Formulaic Encoding~\cite{halliday1994}). Hệ quả là, các báo cáo tài chính của cùng một công ty qua nhiều năm liên tiếp, hoặc của các công ty đối thủ trong cùng một ngành công nghiệp, thường tái sử dụng lại đến 80-90\% cấu trúc câu và kho từ vựng. 
+
+Khi các tài liệu này được biểu diễn dưới dạng vector thông qua các mô hình bi-encoder truyền thống, sự tương đồng áp đảo về từ vựng (lexical) sẽ che lấp đi sự khác biệt mang tính quyết định về các thông tin thực thể (siêu dữ liệu như năm, tên công ty, ngành nghề). Tình trạng này khiến cho các mô hình truy xuất bị rơi vào hiện tượng "Ảo giác trùng lặp từ vựng" (Lexical Overlap Illusion), trong đó mô hình chấm điểm tương đồng rất cao cho các tài liệu sai thời điểm hay sai đối tượng, chỉ vì chúng chia sẻ chung một cấu trúc ngữ pháp.
 
 \subsection{Sự phá hủy Cấu trúc Toán học khi Làm phẳng Bảng (Mathematical Flattening)}
-Khi dense retrieval truyền thống xử lý bảng, bảng thường được tuyến tính hóa (làm phẳng) thành chuỗi markdown hoặc chuỗi văn bản. Dưới góc nhìn của Lý thuyết Thông tin~\cite{cover2006}, lượng thông tin biểu diễn $H(T)$ của một bảng tài chính $T$ được cấu thành từ:
+Để đưa bảng biểu vào các mô hình transformer, phương pháp thông thường là tuyến tính hóa (làm phẳng) bảng thành chuỗi markdown hoặc chuỗi văn bản liền mạch. Dưới góc nhìn của Lý thuyết Thông tin~\cite{cover2006}, tổng lượng thông tin biểu diễn $H(T)$ của một bảng tài chính $T$ có thể được phân tách thành:
 \begin{equation}
     H(T) = H_{\text{Text}}(T) + H_{\text{Structure}}(T) + H_{\text{Numbers}}(T)
 \end{equation}
-Trong đó $H_{\text{Structure}}(T)$ chứa lượng thông tin về ràng buộc toán học và logic phân cấp (cha-con). Khi tuyến tính hóa bảng, mô hình phải chịu một lượng mất mát thông tin $I_{\text{loss}} \ge H_{\text{Structure}}(T)$. Do không còn khả năng tiếp cận các ràng buộc này (ví dụ: việc tổng các quý phải bằng doanh thu năm), mô hình không thể phân biệt được một bảng có cấu trúc dữ liệu hợp lệ với một chuỗi các con số ngẫu nhiên.
+Trong công thức này, $H_{\text{Structure}}(T)$ nắm giữ lượng thông tin vô giá liên quan đến các ràng buộc toán học và logic phân cấp (cha-con, hàng-cột). Khi thực hiện việc tuyến tính hóa, mô hình buộc phải chịu một lượng mất mát thông tin $I_{\text{loss}}$ có thể xấp xỉ bằng hoặc lớn hơn lượng thông tin cấu trúc ($I_{\text{loss}} \ge H_{\text{Structure}}(T)$). 
+
+Bởi vì mất đi khả năng tiếp cận các ràng buộc này (ví dụ: mô hình không còn biết rằng tổng các quý Q1+Q2+Q3+Q4 phải bằng đúng doanh thu của cả năm), nó hoàn toàn không thể phân biệt được đâu là một bảng báo cáo có cấu trúc dữ liệu hợp lệ, và đâu là một chuỗi văn bản chứa các con số được đặt ngẫu nhiên.
 
 \subsection{Động lực Phương pháp Đề xuất}
-Từ hai phân tích trên, chúng tôi rút ra kết luận: Một hệ thống truy xuất tài liệu tài chính xuất sắc cần thỏa mãn hai điều kiện: (1) Phải mô hình hóa rõ ràng (explicitly) tín hiệu thực thể để chống lại sự nhầm lẫn; (2) Phải xây dựng lại cấu trúc đồ thị từ bảng và tích hợp cơ chế kiểm tra sự toàn vẹn của các phép toán kế toán (Constraint Satisfaction) để bù đắp lượng thông tin cấu trúc đã mất.
+Từ hai phân tích lý thuyết nêu trên, chúng tôi rút ra một kết luận quan trọng mang tính tiên quyết: Một hệ thống truy xuất tài liệu tài chính tiên tiến phải thỏa mãn hai điều kiện bắt buộc:
+\begin{enumerate}
+    \item \textbf{(Giả thuyết H1 \& H2):} Hệ thống phải biểu diễn rõ ràng (explicitly) tín hiệu thực thể để chống lại sự nhầm lẫn trùng lặp từ vựng, đồng thời có khả năng phục dựng lại cấu trúc đồ thị của bảng và kiểm tra sự toàn vẹn của các phép toán kế toán (Constraint Satisfaction) nhằm bù đắp lượng thông tin cấu trúc đã mất.
+    \item \textbf{(Giả thuyết H3):} Quá trình huấn luyện chỉ thực sự hội tụ vào các đặc trưng logic nếu mô hình bị ép buộc phải phân biệt các tài liệu đúng với các mẫu nhiễu được cố ý phá vỡ cấu trúc toán học.
+\end{enumerate}
 
 \section{Phương pháp Đề xuất: GSR và CACL}
 
 \subsection{Định nghĩa Bài toán (Problem Formulation)}
-Cho một tập ngữ liệu (corpus) $\mathcal{C} = \{C_1, \ldots, C_N\}$, mỗi tài liệu $C_i = (t_i, T_i, m_i)$ bao gồm văn bản tự sự $t_i$, bảng định dạng markdown $T_i$, và siêu dữ liệu $m_i = (\text{company}_i, \text{year}_i, \text{sector}_i)$. Đầu vào là một câu hỏi $Q$, mục tiêu là xây dựng mô hình $f_\theta(Q, \mathcal{C})$ truy xuất ra top-$K$ tài liệu liên quan nhất để tối ưu các chỉ số MRR và Recall.
+Cho một tập ngữ liệu (corpus) $\mathcal{C} = \{C_1, \ldots, C_N\}$. Mỗi tài liệu $C_i$ được biểu diễn dưới dạng một bộ ba $C_i = (t_i, T_i, m_i)$, trong đó bao gồm văn bản tự sự $t_i$, bảng định dạng markdown $T_i$, và các thông tin siêu dữ liệu $m_i = (\text{company}_i, \text{year}_i, \text{sector}_i)$. Với một câu hỏi đầu vào $Q$, bài toán đặt ra là cần xây dựng một mô hình $f_\theta(Q, \mathcal{C})$ có khả năng đánh giá và truy xuất ra danh sách top-$K$ tài liệu liên quan nhất, nhằm tối ưu hóa các chỉ số đánh giá tiêu chuẩn như MRR và Recall.
 
 \subsection{Khung Truy xuất Cấu trúc Đồ thị (GSR)}
 
-GSR bao gồm ba module chính: Xây dựng đồ thị Constraint KG, Trích xuất đặc trưng bằng Edge-Aware GAT, và Bộ chấm điểm tổng hợp Joint Scorer.
+Khung kiến trúc GSR được thiết kế để giải quyết bài toán thông qua ba module chính: Xây dựng đồ thị Constraint KG, Trích xuất đặc trưng bằng mạng Edge-Aware GAT, và Bộ chấm điểm tổng hợp Joint Scorer.
 
 \textbf{1. Xây dựng Đồ thị Ràng buộc Kế toán (Constraint KG Construction):}
-Mỗi bảng $T_i$ được phân tích cú pháp thành một đồ thị có hướng $G_D = (\mathcal{V}, \mathcal{E}, \omega)$. Tập node $\mathcal{V}$ là các ô trong bảng. Tập cạnh $\mathcal{E}$ và trọng số cạnh $\omega_{uv} \in \{+1, -1, 0\}$ được xây dựng bằng cách so khớp (template matching) header của bảng với một thư viện gồm 15 mẫu báo cáo IFRS/GAAP phổ biến (ví dụ: Income Statement, Balance Sheet). Nếu một mối quan hệ kế toán được phát hiện (ví dụ $u$ là "Revenue", $v$ là "Gross Profit", $x$ là "COGS" với $u - x = v$), các cạnh sẽ được gán trọng số $\omega = +1$ (cộng) hoặc $\omega = -1$ (trừ). Các ô không có liên hệ kế toán được nối bằng các cạnh vị trí với $\omega = 0$.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{fig2_kg_construction.png}
+    \caption{KG Construction: Bảng markdown được Parse $\to$ Template Matching $\to$ trích xuất Constraint Edges $(\omega)$. Nếu không khớp, lùi về sử dụng positional edges $(\omega = 0)$.}
+    \label{fig:kg}
+\end{figure}
+
+Mỗi bảng markdown $T_i$ được phân tích cú pháp để chuyển đổi thành một đồ thị có hướng $G_D = (\mathcal{V}, \mathcal{E}, \omega)$. Tập hợp các node $\mathcal{V}$ đại diện cho từng ô (cell) trong bảng. Việc xác định tập cạnh $\mathcal{E}$ và trọng số cạnh $\omega_{uv} \in \{+1, -1, 0\}$ được thực hiện thông qua cơ chế so khớp (template matching). Chúng tôi so khớp các header của bảng với một thư viện chuẩn gồm 15 mẫu báo cáo IFRS/GAAP phổ biến (chẳng hạn như Bảng cân đối kế toán, Báo cáo kết quả hoạt động kinh doanh). 
+
+Khi một mối quan hệ kế toán được phát hiện -- ví dụ: node $u$ (Revenue), node $v$ (Gross Profit), node $x$ (COGS) thỏa mãn công thức $u - x = v$ -- hệ thống sẽ sinh ra các cạnh kết nối chúng và gán trọng số tương ứng: $\omega = +1$ cho phép cộng và $\omega = -1$ cho phép trừ. Đối với các ô không mang liên hệ toán học rõ ràng, chúng tôi sử dụng các cạnh vị trí với trọng số $\omega = 0$.
 
 \textbf{2. Bộ Mã hóa GAT Nhận biết Cạnh (Edge-Aware GAT Encoder):}
-Để tích hợp dấu của các phép toán vào quá trình truyền tin (message passing), chúng tôi đề xuất mạng GAT nhận biết cạnh. Tính toán Attention $e_{uv}^{(k)}$ ở layer $l$, head $k$ được điều chỉnh bằng trọng số cạnh:
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}[b]{0.55\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{fig3_gat_encoder.png}
+        \captionof{figure}{Tổng quan kiến trúc GAT Encoder.}
+    \end{minipage}
+    \hfill
+    \begin{minipage}[b]{0.42\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{fig3b_edge_attention.png}
+        \captionof{figure}{Cơ chế Edge-aware attention.}
+    \end{minipage}
+    \caption{GAT Encoder: Dữ liệu từ các node trải qua $L=2$ lớp edge-aware GAT, sau đó được mean-pooling thành vector $\mathbf{d}_{\text{KG}}$. Trong quá trình attention, trọng số $\omega_{uv}$ được dùng để bias sự tập trung.}
+    \label{fig:gat}
+\end{figure}
+
+Để đảm bảo mạng nơ-ron có thể hiểu được dấu của các phép toán, chúng tôi thay đổi cơ chế truyền tin (message passing) bằng mạng GAT nhận biết cạnh. Đặc trưng đầu vào của node $\mathbf{x}_v$ được nhúng qua một feed-forward network. Trong quá trình tính toán Attention $e_{uv}^{(k)}$ ở layer thứ $l$ và head thứ $k$, hệ số tương quan được cộng thêm một giá trị hình chiếu từ trọng số cạnh:
 \begin{equation}
     e_{uv}^{(k)} = \frac{\langle W_q^{(k)} \mathbf{h}_u^{(l)},\; W_k^{(k)} \mathbf{h}_v^{(l)} \rangle}{\sqrt{d_k}} + \text{Proj}(\omega_{uv})
 \end{equation}
-Sau $L$ layers truyền tin, đồ thị được mean-pooling để tạo ra graph embedding tổng cục $\mathbf{d}_{\text{KG}} \in \mathbb{R}^h$.
+\begin{equation}
+    \alpha_{uv}^{(k)} = \frac{\exp(e_{uv}^{(k)})}{\sum_{w \in \mathcal{N}(v)} \exp(e_{wv}^{(k)})}
+\end{equation}
+Thông qua $L$ lớp truyền tin, cấu trúc tổng thể của đồ thị được nén lại bằng phép mean-pooling để tạo ra một graph embedding tổng cục $\mathbf{d}_{\text{KG}} \in \mathbb{R}^h$.
 
 \textbf{3. Bộ Chấm điểm Tổng hợp (Joint Scorer):}
-Bộ chấm điểm kết hợp ba nguồn tín hiệu để đánh giá tài liệu $C$ cho truy vấn $Q$:
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\textwidth]{fig4_joint_scorer.png}
+    \caption{Joint Scorer $\phi_\theta$: Kết hợp khéo léo ba nguồn tín hiệu bổ trợ với các trọng số có thể tự động học được $(\alpha, \beta, \gamma)$.}
+    \label{fig:scorer}
+\end{figure}
+
+GSR đánh giá mức độ phù hợp của một tài liệu $C$ đối với truy vấn $Q$ bằng một hàm điểm tổng hợp, kết hợp ba nguồn tín hiệu độc lập:
 \begin{equation}
     s(Q, C) = \alpha \cdot s_{\text{text}}(Q, C) + \beta \cdot s_{\text{ent}}(Q, C) + \gamma \cdot \text{CS}(G_D)
 \end{equation}
-Trong đó:
+Cụ thể, các thành phần đóng góp như sau:
 \begin{itemize}[leftmargin=*]
-    \item $s_{\text{text}}$ là cosine similarity giữa embedding của câu hỏi và văn bản từ Shared Backbone.
-    \item $s_{\text{ent}}$ là điểm số đối sánh siêu dữ liệu thực thể (học qua SupCon Loss).
-    \item $\text{CS}(G_D)$ là điểm tuân thủ ràng buộc kế toán (Constraint Score), được tính toán dựa trên mức độ chênh lệch giữa các ô cha và tổng các ô con trên toàn bộ đồ thị $G_D$, có sử dụng một ngưỡng dung sai $\varepsilon$.
-    \item $\alpha, \beta, \gamma$ là các tham số trọng số được học tự động thông qua hàm `softplus` để luôn nhận giá trị dương.
+    \item $s_{\text{text}}$ biểu thị tính tương đồng (cosine similarity) giữa không gian vector của câu hỏi và văn bản, được trích xuất từ Shared Backbone chung.
+    \item $s_{\text{ent}}$ là điểm số căn chỉnh siêu dữ liệu thực thể, được mô hình hóa qua hàm mất mát SupCon Loss để tăng tính rạch ròi giữa các thực thể khác nhau.
+    \item $\text{CS}(G_D)$ là điểm tuân thủ ràng buộc kế toán (Constraint Score). Hàm này đo lường sự chênh lệch giữa các ô là "cha" và tổng cộng các ô "con" trên đồ thị. Nó sử dụng một hàm mũ kết hợp với ngưỡng dung sai $\varepsilon$ để cho phép những sai số làm tròn nhỏ:
+    \begin{equation}
+        \text{CS}(G_D) = \frac{1}{|\mathcal{E}_c|} \sum_{(u,v,\omega) \in \mathcal{E}_c} \exp\!\Big(-\frac{|\omega \cdot v_u - v_v|}{\max(|v_v|, \varepsilon)}\Big) \in (0, 1]
+    \end{equation}
+    \item Cuối cùng, $\alpha, \beta, \gamma$ là các tham số trọng số tự học được trong quá trình training. Chúng tôi sử dụng hàm kích hoạt `softplus` để đảm bảo các trọng số này luôn nhận giá trị dương hợp lệ.
 \end{itemize}
 
 \subsection{Học đối lập Nhận biết Ràng buộc (CACL)}
 
 \textbf{1. Lấy mẫu âm CHAP (Constraint-Aware Hard Negative Generation):}
-Để dạy mô hình hiểu logic kế toán, chúng tôi tạo ra các mẫu âm khó từ tài liệu dương $C^+$ thông qua 3 phép biến đổi:
-- \textbf{A (Additive):} Thay đổi giá trị 1 ô con, phá vỡ định luật tổng $\to$ sinh lỗi toán học vi mô.
-- \textbf{S (Scale):} Biến đổi bậc đại lượng của một cột $\to$ phá vỡ tỷ lệ cấu trúc.
-- \textbf{E (Entity):} Hoán đổi company/year $\to$ sinh lỗi thực thể.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{fig5_chap.png}
+    \caption{CHAP Negative Sampler: Ba kiểu nhiễu loạn tinh vi, trong đó mỗi kiểu tập trung phá vỡ đúng một phương trình kế toán hoặc một thuộc tính thực thể.}
+    \label{fig:chap}
+\end{figure}
+
+Để dạy mô hình thực sự thấu hiểu được logic toán học thay vì chỉ ghi nhớ các từ vựng lân cận, CACL sử dụng kỹ thuật CHAP. Kỹ thuật này tự động tạo ra các mẫu âm cực kỳ khó ($C^-$) từ các tài liệu gốc ($C^+$) thông qua 3 phép biến đổi độc lập:
+\begin{itemize}[leftmargin=*]
+    \item \textbf{A (Additive):} Chủ động thay đổi giá trị của đúng một ô dữ liệu con, khiến cho định luật tính tổng bị phá vỡ (sinh ra lỗi toán học vi mô).
+    \item \textbf{S (Scale):} Nhân hoặc chia một cột với một đại lượng bậc mười (ví dụ $\times 1000$), từ đó phá vỡ đi tính tỷ lệ của cấu trúc báo cáo.
+    \item \textbf{E (Entity):} Hoán đổi các siêu dữ liệu như công ty hoặc năm tài chính, trực tiếp sinh ra các mẫu âm đánh lừa năng lực nhận diện thực thể của mô hình.
+\end{itemize}
 
 \textbf{2. Three-Stage Curriculum Training:}
-Chúng tôi thiết kế chiến lược huấn luyện 3 giai đoạn:
-- \textit{Stage 1 (Identity Pretraining):} Huấn luyện Shared Backbone nhận diện từ vựng và thực thể sử dụng Triplet Loss và EntitySupConLoss~\cite{khosla2020supcon}.
-- \textit{Stage 2 (Structural Pretraining):} Huấn luyện độc lập GAT Encoder để cực đại hóa Constraint Score $\text{CS}(G_D) \approx 1$ cho các tài liệu hợp lệ.
-- \textit{Stage 3 (Joint CACL):} Huấn luyện End-to-End toàn bộ hệ thống bằng mẫu âm CHAP kết hợp hàm mục tiêu $\mathcal{L}_{\text{triplet}}$ và điểm phạt vi phạm ràng buộc $\mathcal{L}_{\text{constraint}}$.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{fig6_cacl_loss.png}
+    \caption{CACL Training Objective: Sự kết hợp giữa margin-based triplet loss và constraint violation penalty.}
+    \label{fig:loss}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{fig7_curriculum.png}
+    \caption{Chiến lược Three-Stage Curriculum: Sự dịch chuyển trọng tâm huấn luyện $\theta_1 \to \theta_2 \to \theta_3 = \theta^*$.}
+    \label{fig:curriculum}
+\end{figure}
+
+Thay vì huấn luyện end-to-end ngay từ đầu vốn có rủi ro mô hình không thể hội tụ, chúng tôi thiết kế chiến lược học tăng cường dần (Curriculum Learning) gồm 3 giai đoạn:
+\begin{itemize}[leftmargin=*]
+    \item \textit{Stage 1 (Identity Pretraining):} Giai đoạn này tập trung hoàn toàn vào việc huấn luyện Shared Backbone để nó có khả năng phân biệt từ vựng và nhận diện rạch ròi các siêu dữ liệu thực thể, sử dụng kết hợp hàm Triplet Loss tiêu chuẩn và hàm EntitySupConLoss~\cite{khosla2020supcon}.
+    \item \textit{Stage 2 (Structural Pretraining):} Huấn luyện độc lập mạng GAT Encoder thông qua việc cực đại hóa điểm Constraint Score $\text{CS}(G_D) \approx 1$ cho các tài liệu gốc hợp lệ.
+    \item \textit{Stage 3 (Joint CACL):} Mở rộng không gian huấn luyện toàn diện End-to-End bằng việc nhồi thêm các mẫu âm CHAP. Giai đoạn này sử dụng một hàm mục tiêu phức hợp bao gồm Triplet Loss $\mathcal{L}_{\text{triplet}}$ để phân loại đúng sai, và điểm phạt vi phạm ràng buộc $\mathcal{L}_{\text{constraint}}$ để trừng phạt mạnh tay đối với những tài liệu có dấu hiệu vi phạm tính toán nội tại.
+\end{itemize}
 
 \section{Cài đặt Thực nghiệm (Experimental Setup)}
 
-\textbf{Tập dữ liệu:} Thực nghiệm trên 3 bộ dữ liệu thuộc $\mathrm{T}^2$-RAGBench~\cite{strich2026t2ragbench}: FinQA (2,789 báo cáo từ S\&P 500), ConvFinQA (1,806 báo cáo), và TAT-DQA (2,723 báo cáo với đa dạng định dạng bảng). 
+\textbf{Tập dữ liệu:} Các nghiên cứu thực nghiệm được tiến hành trên 3 bộ dữ liệu có độ khó cao thuộc chuẩn đánh giá $\mathrm{T}^2$-RAGBench~\cite{strich2026t2ragbench}: FinQA (bao gồm 2,789 báo cáo đến từ chỉ số S\&P 500), ConvFinQA (1,806 báo cáo hội thoại), và TAT-DQA (2,723 báo cáo chứa định dạng bảng đa dạng). 
 
-\textbf{Baselines:} So sánh GSR với các hệ thống truy xuất trực tiếp (Base-RAG/DPR~\cite{karpukhin2020dpr}, Hybrid BM25), hệ thống dùng LLM tiền xử lý (HyDE, Summarization với QwQ-32B), và các hệ thống nhận biết bảng (THoRR~\cite{thorr2024}, ConFIT~\cite{confit2025}). Text encoder dùng BAAI/bge-large-en-v1.5.
+\textbf{Baselines:} Để đánh giá khách quan, chúng tôi thiết lập so sánh GSR với nhiều phân khúc phương pháp: Các hệ thống truy xuất trực tiếp tiêu chuẩn (Base-RAG/DPR~\cite{karpukhin2020dpr}, Hybrid BM25), các phương pháp phức tạp sử dụng LLM tham gia tiền xử lý (như HyDE, Summarization được tăng cường bởi QwQ-32B), và các hệ thống đặc chế hỗ trợ nhận biết bảng (THoRR~\cite{thorr2024}, ConFIT~\cite{confit2025}). Bộ Text encoder cốt lõi được sử dụng chung là mô hình BAAI/bge-large-en-v1.5.
 
-\textbf{Chỉ số đánh giá (Metrics):} Tập trung vào MRR@3, Recall@3, và NDCG@3.
+\textbf{Chỉ số đánh giá (Metrics):} Khả năng truy xuất được đo lường khắt khe bằng các chỉ số MRR@3, Recall@3, và NDCG@3.
 
 \section{Kết quả và Phân tích (Results \& Analysis)}
 
-Để chứng minh cho các giả thuyết đã đặt ra ở Mục 3.3: \textbf{Bảng 2} (Ablation) được thiết kế nhằm khẳng định vai trò của tính nhất quán kế toán và cấu trúc thực thể; trong khi \textbf{Bảng 3} (CHAP Analysis) kiểm chứng trực tiếp giá trị của mẫu âm khó dựa trên ràng buộc.
+Mục đích của phần thực nghiệm không chỉ là trình bày các chỉ số SOTA mà còn nhằm chứng minh các giả thuyết lý thuyết đã đặt ra ở Mục 3.3. Trong đó, \textbf{Bảng 2} (Ablation) được xây dựng nhằm khẳng định tính tất yếu của sự nhất quán kế toán và cấu trúc thực thể; trong khi \textbf{Bảng 3} (CHAP Analysis) kiểm chứng thực tiễn về sức mạnh phân biệt của các mẫu âm khó.
 
 \subsection{Main Results}
 
@@ -160,7 +237,7 @@ GSR (Inference-only) & BGE-Large (GSR Architecture) & --- & 60.4 & 65.0 & 65.9 &
 \textbf{GSR + CACL} & \textbf{BGE-Large (GSR + CACL Train)} & \textbf{---} & \textbf{63.8} & \textbf{68.5} & \textbf{68.4} & \textbf{74.2} & \textbf{32.8} & 41.5 \\
 \bottomrule
 \end{tabular}
-\caption{\textbf{Main Results.} Đánh giá năng lực của pha Truy xuất. GSR+CACL vượt trội hoàn toàn các baseline kể cả những baseline dùng LLM 32B tiền xử lý.}
+\caption{\textbf{Main Results.} Đánh giá năng lực tổng thể của pha Truy xuất. Phương pháp GSR+CACL cho thấy sức mạnh vượt trội, đánh bại hoàn toàn các baselines kể cả những phương pháp nặng nề yêu cầu mô hình LLM 32B để tiền xử lý.}
 \label{tab:main}
 \end{table*}
 
@@ -183,10 +260,11 @@ GSR w/ Standard GAT & Bỏ Edge-Aware Attention (không dùng $\omega_{uv}$) & 5
 GSR w/ Fixed Weights & Gán cứng $\alpha=0.5, \beta=0.3, \gamma=0.2$ & 58.9 \\
 \bottomrule
 \end{tabular}
-\caption{\textbf{Ablation study trên FinQA.} Sự sụt giảm điểm số chứng minh đóng góp trọng yếu của từng thành phần.}
+\caption{\textbf{Ablation study trên FinQA.} Những mức độ sụt giảm điểm số khác nhau cung cấp bằng chứng rõ ràng cho đóng góp trọng yếu của từng thành phần trong mô hình.}
 \label{tab:ablation}
 \end{table}
-Phân tích từ Bảng~\ref{tab:ablation} khẳng định: Việc bỏ đi Constraint KG gây sụt giảm nặng nề nhất (xuống 51.2), chứng minh cấu trúc toán học là tín hiệu phân loại mạnh nhất. Ngoài ra, việc thay thế Edge-aware GAT bằng GAT tiêu chuẩn cũng làm giảm điểm, cho thấy mô hình thực sự tận dụng được dấu (+1, -1) của kế toán chứ không chỉ là thông tin cấu trúc đồ thị chung chung.
+
+Các phân tích số liệu từ Bảng~\ref{tab:ablation} chỉ ra sự khẳng định mạnh mẽ cho thiết kế kiến trúc: Việc loại bỏ Constraint KG gây ra hậu quả tàn phá nặng nề nhất (điểm MRR@3 rơi thẳng xuống 51.2). Điều này củng cố luận điểm rằng cấu trúc toán học chính là một tín hiệu phân loại mạnh nhất bị bỏ lỡ bởi các mô hình truyền thống. Đáng chú ý, việc thoái lui từ Edge-aware GAT về cấu trúc GAT tiêu chuẩn cũng khiến điểm số hao hụt, một bằng chứng thuyết phục cho thấy mạng nơ-ron của chúng tôi đã thực sự tính toán và suy luận dựa trên dấu (+1, -1) của các công thức kế toán, chứ không đơn thuần chỉ lan truyền thông tin qua lại trên các node.
 
 \subsection{Phân tích Năng lực Phân biệt (CHAP Analysis)}
 
@@ -201,10 +279,11 @@ BM25 hard negatives & 50.0 & 65.3 & 78.4 & \textbf{83.7} \\
 CHAP negatives (vi phạm logic) & 48.1 & 49.5 & 71.2 & \textbf{92.5} \\
 \bottomrule
 \end{tabular}
-\caption{\textbf{Pairwise Accuracy (\%):} Khả năng phân biệt tài liệu đúng/sai theo từng cấp độ khó của negative.}
+\caption{\textbf{Pairwise Accuracy (\%):} Biểu đồ minh họa độ chính xác khi mô hình được yêu cầu phân biệt tài liệu gốc và tài liệu nhiễu theo từng cấp độ khó.}
 \label{tab:chap_analysis}
 \end{table}
-Bảng~\ref{tab:chap_analysis} cho thấy các mô hình truyền thống (BM25) hoàn toàn bất lực (hiệu năng tương đương đoán mò ngẫu nhiên $\sim$50\%) khi đối mặt với CHAP negatives, do chúng bị đánh lừa bởi bề mặt từ vựng giống nhau 99\%. Chỉ có GSR+CACL nhận diện xuất sắc sự khác biệt về logic kế toán.
+
+Qua lăng kính Bảng~\ref{tab:chap_analysis}, ta có thể dễ dàng thấy các mô hình truy xuất truyền thống như BM25 và Hybrid đều thể hiện sự bất lực hoàn toàn (với mức hiệu năng chỉ tương đương đoán mò ngẫu nhiên $\sim$50\%) khi bị đặt trước các mẫu nhiễu CHAP. Nguyên nhân sâu xa là chúng bị đánh lừa bởi bề mặt từ vựng gần như giống hệt nhau (chỉ khác nhau một con số). Điểm sáng thuộc về GSR+CACL, mô hình duy nhất có năng lực nhận diện xuất sắc sự khác biệt tế nhị về logic kế toán, vươn lên mốc chính xác 92.5\%.
 
 \subsection{Tính Tổng quát hóa chéo Lĩnh vực (Cross-Domain Zero-shot)}
 
@@ -218,17 +297,17 @@ FinQA + ConvFinQA & TAT-DQA & 28.5 & $-4.3$ (vs 32.8) \\
 TAT-DQA & FinQA & 56.4 & $-7.4$ (vs 63.8) \\
 \bottomrule
 \end{tabular}
-\caption{\textbf{Zero-shot Transfer.} GSR suy giảm biên độ nhỏ khi chạy zero-shot, chứng minh logic kế toán có tính phổ quát.}
+\caption{\textbf{Zero-shot Transfer.} Mặc dù chạy zero-shot trên tập kiểm thử hoàn toàn mới, GSR chỉ bị suy giảm một biên độ tương đối nhỏ, minh chứng rằng quy luật logic kế toán sở hữu một tính phổ quát vượt trội qua nhiều domain.}
 \label{tab:cross_domain}
 \end{table}
 
 \subsection{Phân tích Lỗi và Độ phủ (Error \& Coverage Analysis)}
 
-Khảo sát 15 mẫu IFRS/GAAP trên tập FinQA đạt độ phủ ấn tượng 87.0\% với trung bình 11.4 cạnh/bảng. Lỗi phổ biến nhất của dense retrieval là nhầm lẫn thực thể (Entity Confusion) nay chỉ còn chiếm 15.2\% tổng số ca dự đoán sai của GSR. Hiện tại, hai nguồn lỗi chính là sự nhập nhằng số liệu (Numerical Ambiguity, 21.4\%) và các bảng phi tiêu chuẩn không khớp template (Template Miss, 28.5\%).
+Khi tiến hành khảo sát độ khớp của 15 mẫu IFRS/GAAP trên tập FinQA, kết quả trả về vô cùng khả quan với mức độ phủ 87.0\%, đạt trung bình 11.4 liên kết kế toán cho mỗi bảng. Phân tích đi sâu vào các ca lỗi cho thấy sự biến chuyển tích cực: Lỗi phổ biến chết người của dense retrieval truyền thống là nhầm lẫn thực thể (Entity Confusion) nay đã bị khắc chế, chỉ còn chiếm vỏn vẹn 15.2\% tổng số lượng dự đoán sai của GSR. Trong phiên bản hiện tại, giới hạn của hệ thống chủ yếu tồn tại ở sự nhập nhằng các con số lẻ tẻ (Numerical Ambiguity, 21.4\%) và sự bất quy tắc của các bảng tự do không thể so khớp được template (Template Miss, 28.5\%).
 
 \section{Kết luận (Conclusion)}
 
-Bài báo đã phân tích sâu sắc các hạn chế của dense retrieval khi áp dụng vào tài liệu tài chính, đặc biệt là sự nhầm lẫn thực thể và sự biến mất của cấu trúc toán học khi làm phẳng bảng. Thông qua GSR và phương pháp huấn luyện CACL, chúng tôi đưa ra giải pháp giải quyết tận gốc vấn đề bằng cách mô hình hóa siêu dữ liệu và xây dựng đồ thị ràng buộc kế toán. Kết quả thực nghiệm vượt trội trên ba tập dữ liệu benchmark lớn khẳng định tính đúng đắn của phương pháp, mở ra định hướng mới trong việc thiết kế các hệ thống RAG có khả năng suy luận cấu trúc cho lĩnh vực tài chính.
+Nghiên cứu này đã đào sâu và chỉ ra những hạn chế mang tính hệ thống của dense retrieval khi áp dụng vào các tài liệu tài chính chuyên sâu, tập trung vào vấn đề nhầm lẫn từ vựng thực thể và sự biến mất của cấu trúc tính toán khi bảng bị làm phẳng. Thông qua khung kiến trúc đề xuất GSR cùng phương pháp huấn luyện CACL, chúng tôi mở ra một lời giải tận gốc bằng cách trực tiếp mô hình hóa siêu dữ liệu và nhúng đồ thị ràng buộc kế toán vào lòng hệ thống. Kết quả thực nghiệm vượt trội, phá vỡ giới hạn trên cả ba bộ dữ liệu chuẩn mực nhất hiện nay, một lần nữa khẳng định tính đúng đắn và hiệu quả của phương pháp. Nghiên cứu hứa hẹn sẽ mở ra nhiều hướng đi đột phá trong việc kiến tạo các hệ thống RAG có năng lực suy luận cấu trúc sâu sắc dành riêng cho miền tài chính.
 
 \bibliographystyle{plain}
 \begin{thebibliography}{9}
